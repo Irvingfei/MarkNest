@@ -343,6 +343,13 @@ if (!CMD) {
       { doc: '', from: 0, to: 0, selected: '' }, '****'],
     ['italic wraps a selection', 'italic',
       { doc: 'hi', from: 0, to: 2, selected: 'hi' }, '*hi*'],
+    // `wrap`'s unwrap branch - the selection itself already carries the markers.
+    // The corrected toggle loop no longer reaches it, because its second press
+    // hands over the inner text rather than the wrapped result, so the direct
+    // gesture is asserted here. The forbidden term is what makes it bite:
+    // 'text' is also a substring of the '****text****' a missing branch returns.
+    ['bold unwraps a selection that already has the markers', 'bold',
+      { doc: '**text**', from: 0, to: 8, selected: '**text**' }, 'text', '**'],
     ['inline code wraps a selection', 'code',
       { doc: 'x', from: 0, to: 1, selected: 'x' }, '`x`'],
     ['a code block gets a fenced body', 'codeblock',
@@ -402,6 +409,10 @@ if (!CMD) {
     // inline text and the closing one opens a block that swallows the note.
     ['a code block starts on its own line', 'codeblock',
       { doc: 'abc', from: 3, to: 3, selected: '' }, '\n```\n\n```'],
+    // The with-selection branch, whole insertion compared so the leading and
+    // trailing newlines are both pinned - the same reason the table case does.
+    ['a code block around a selection is fenced on its own lines', 'codeblock',
+      { doc: 'xwordy', from: 1, to: 5, selected: 'word' }, '\n```\nword\n```\n'],
     // A table has to end its own line for the same reason a fence does: the
     // text after the caret would otherwise glue onto the last row. The caret is
     // mid-word on purpose - at the end of the document the tail is empty and
@@ -591,8 +602,18 @@ if (!CMD) {
       }
     }
     const labelled = linkFn({ doc: '', from: 0, to: 0, selected: '' }, url, 'Text');
-    if (labelled.changes.insert !== '[Text](' + url + ')') {
-      cmdProblems.push(`link without a selection inserted ${JSON.stringify(labelled.changes.insert)}`);
+    const labelledInsert = labelled.changes.insert;
+    if (labelledInsert !== '[Text](' + url + ')') {
+      cmdProblems.push(`link without a selection inserted ${JSON.stringify(labelledInsert)}`);
+    } else {
+      // Asserted here too, not only in the with-selection case above: both
+      // callers are promised a URL they can retype without selecting it.
+      const labelledPicked = labelledInsert.slice(labelled.selection.anchor, labelled.selection.head);
+      if (labelledPicked !== url) {
+        cmdProblems.push(
+          `link without a selection did not select the URL: ` +
+          `${JSON.stringify(labelled.selection)} picks ${JSON.stringify(labelledPicked)}`);
+      }
     }
   }
 }
