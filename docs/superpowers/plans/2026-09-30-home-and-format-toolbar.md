@@ -351,9 +351,9 @@ const VENDOR_SURFACE = ['create', 'render', 'applyEdit'];
       '|[{,]' + member + '\\s*\\([^)]*\\)\\s*\\{'
 ```
 
-> **为什么不能写成 `[.\s{;,]`（即把第一种的前导集也给它）**：那样第三种形态退化成纯粹的"文本出现"检查，任何位置的 `名字(...) {` 都算数。实测 15 个构造用例里有 **9 个被骗过**——包括 `view.applyEdit(s)` 后面跟一个换行和一个块、`function applyEdit(a){}`、`class Foo{applyEdit(a){}}`，以及注释、字符串、模板里的同名文本。而 `applyEdit` 这种名字恰恰最可能出现在注释或文档里。
+> **为什么不能写成 `[.\s{;,]`（即把第一种的前导集也给它）**：那样第三种形态退化成纯粹的"文本出现"检查，任何位置的 `名字(...) {` 都算数。实测 15 个构造用例里有 **9 个被骗过**——包括 `view.applyEdit(s)` 后面跟一个换行和一个块、`function applyEdit(a){}`，以及注释、字符串、模板里的同名文本。而 `applyEdit` 这种名字恰恰最可能出现在注释或文档里。
 >
-> 限定为 `{`/`,` 之后仍然匹配真实发出点，但会拒绝调用点、函数声明、类方法和注释形态。代价是理论上 `/*,applyEdit(` 这样的注释仍可能蒙混——比原来窄得多，且这个检查的目的是**发现导出丢失**，不是对抗性防伪。
+> 限定为 `{`/`,` 之后仍然匹配真实发出点，但会拒绝调用点、函数声明和注释形态。**`{` 不能去掉**——对象字面量的第一个成员就是 `return{applyEdit(o){…` 这个形态，去掉它会在合法产物上漏报。因此 `class Foo{applyEdit(a){}}` 这类仍会匹配，属于**有意的取舍**：类方法是比注释强得多的"存在"证据，而这次要堵的是注释、字符串和调用点。代价是理论上 `/*,applyEdit(` 这样的注释仍可能蒙混——比原来窄得多，且这个检查的目的是**发现导出丢失**，不是对抗性防伪。
 
 **加宽后必须验证它两个方向都不是空转**：
 
@@ -361,7 +361,18 @@ const VENDOR_SURFACE = ['create', 'render', 'applyEdit'];
 |---|---|---|
 | 能认出真实导出 | 收紧后跑 `node tools/webui_check.js` | `RESULT: PASSED` |
 | **仍能发现缺失** | 把 bundle 里的 `,applyEdit(o){` 改成 `,applyEditXX(o){` | **FAIL**，且点名 `applyEdit` |
-| **不再被骗** | 对上面 9 个构造串逐个测同一正则 | 全部**不匹配** |
+| **不再被骗** | 逐个测下面 5 个构造串 | 全部**不匹配** |
+| 第一种形态没被弄坏 | 测 `Ur.create=jP`、`Ur.render=ZP` | 仍**匹配** |
+
+不再被骗的 5 个构造串：`view.applyEdit(s)\n{}` · `function applyEdit(a){}` · `/* obj.applyEdit(x){ */` · `// obj.applyEdit(x){` · `"obj.applyEdit(x){"`
+
+**加宽后必须验证它两个方向都不是空转**：
+
+| 验证 | 做法 | 期望 |
+|---|---|---|
+| 能认出真实导出 | 收紧后跑 `node tools/webui_check.js` | `RESULT: PASSED` |
+| **仍能发现缺失** | 把 bundle 里的 `,applyEdit(o){` 改成 `,applyEditXX(o){` | **FAIL**，且点名 `applyEdit` |
+| **不再被骗** | 对上面那 5 个构造串逐个测同一正则 | 全部**不匹配** |
 | 第一种形态没被弄坏 | 测 `Ur.create=jP`、`Ur.render=ZP` | 仍**匹配** |
 
 **加宽后必须验证它不是空转**——拿变更前的 bundle 回放（`git show HEAD~:webui/js/vendor.editor.js`）：
