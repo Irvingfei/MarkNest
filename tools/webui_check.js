@@ -335,7 +335,8 @@ if (!CMD) {
   cmdProblems.push('MDCmd is not exposed on window');
 } else {
   const cases = [
-    // [label, command, ctx, expected substring in the inserted text]
+    // [label, command, ctx, expected substring in the inserted text,
+    //  optional substring that must NOT appear]
     ['bold wraps a selection', 'bold',
       { doc: 'hello', from: 0, to: 5, selected: 'hello' }, '**hello**'],
     ['bold on bare cursor inserts the markers', 'bold',
@@ -361,9 +362,32 @@ if (!CMD) {
     ['a numbered item prefixes the line', 'numbered',
       { doc: 'item', from: 0, to: 0, selected: '' }, '1. item'],
     ['a table is three columns wide', 'table',
-      { doc: '', from: 0, to: 0, selected: '' }, '| --- | --- | --- |']
+      { doc: '', from: 0, to: 0, selected: '' }, '| --- | --- | --- |'],
+    // Multi-line: a line-start command covers every line the selection
+    // touches, not just the first. Asserting only a single-line line would
+    // pass for an implementation that prefixed the block once.
+    ['quote covers every selected line', 'quote',
+      { doc: 'a\nb', from: 0, to: 3, selected: 'a\nb' }, '> a\n> b'],
+    ['h1 covers every selected line', 'h1',
+      { doc: 'a\nb', from: 0, to: 3, selected: 'a\nb' }, '# a\n# b'],
+    ['h2 covers every selected line', 'h2',
+      { doc: 'a\nb', from: 0, to: 3, selected: 'a\nb' }, '## a\n## b'],
+    ['h3 covers every selected line', 'h3',
+      { doc: 'a\nb', from: 0, to: 3, selected: 'a\nb' }, '### a\n### b'],
+    ['task covers every selected line', 'task',
+      { doc: 'a\nb', from: 0, to: 3, selected: 'a\nb' }, '- [ ] a\n- [ ] b'],
+    ['bullet covers every selected line', 'bullet',
+      { doc: 'a\nb', from: 0, to: 3, selected: 'a\nb' }, '- a\n- b'],
+    ['numbered covers every selected line', 'numbered',
+      { doc: 'a\nb', from: 0, to: 3, selected: 'a\nb' }, '1. a\n1. b'],
+    // bullet must recognise a task item as an unordered item and remove the
+    // whole marker. A substring check alone cannot see this: 'buy milk' IS a
+    // substring of the broken '[ ] buy milk', so the case needs a forbidden
+    // term as well.
+    ['bullet removes a whole task marker', 'bullet',
+      { doc: '- [ ] buy milk', from: 0, to: 14, selected: '' }, 'buy milk', '[ ]']
   ];
-  for (const [label, name, ctx, expected] of cases) {
+  for (const [label, name, ctx, expected, forbidden] of cases) {
     const fn = CMD.commands && CMD.commands[name];
     if (typeof fn !== 'function') { cmdProblems.push(`${label}: MDCmd.commands.${name} is not a function`); continue; }
     const result = fn(ctx);
@@ -371,12 +395,14 @@ if (!CMD) {
       ? result.changes.insert : '';
     if (text.indexOf(expected) === -1) {
       cmdProblems.push(`${label}: expected ${JSON.stringify(expected)} inside ${JSON.stringify(text)}`);
+    } else if (forbidden && text.indexOf(forbidden) !== -1) {
+      cmdProblems.push(`${label}: ${JSON.stringify(forbidden)} should not appear in ${JSON.stringify(text)}`);
     }
   }
   // Toggle-off: applying the same command twice must return the document to
   // where it started. This is the rule that is easiest to implement for half
   // the buttons and forget for the other half.
-  for (const name of ['bold', 'italic', 'code', 'quote', 'h1', 'task', 'bullet', 'numbered']) {
+  for (const name of ['bold', 'italic', 'code', 'quote', 'h1', 'h2', 'h3', 'task', 'bullet', 'numbered']) {
     const fn = CMD.commands && CMD.commands[name];
     if (typeof fn !== 'function') { continue; }
     const once = fn({ doc: 'text', from: 0, to: 4, selected: 'text' });
@@ -384,6 +410,44 @@ if (!CMD) {
     const twice = fn({ doc: applied, from: 0, to: applied.length, selected: applied });
     if (twice.changes.insert !== 'text') {
       cmdProblems.push(`toggle-off: ${name} produced ${JSON.stringify(twice.changes.insert)} on the second press`);
+    }
+  }
+  // The same rule in the remove direction, over more than one line.
+  for (const name of ['quote', 'h1', 'bullet', 'task']) {
+    const fn = CMD.commands && CMD.commands[name];
+    if (typeof fn !== 'function') { continue; }
+    const once = fn({ doc: 'a\nb', from: 0, to: 3, selected: 'a\nb' });
+    const applied = once.changes.insert;
+    const twice = fn({ doc: applied, from: 0, to: applied.length, selected: applied });
+    if (twice.changes.insert !== 'a\nb') {
+      cmdProblems.push(`multi-line toggle-off: ${name} produced ${JSON.stringify(twice.changes.insert)} on the second press`);
+    }
+  }
+  // link is the one command that takes arguments beyond ctx, so it is asserted
+  // separately. The design requires the URL portion to come back selected, so
+  // the person can retype the address without selecting it by hand - a
+  // behaviour nothing else here would notice going missing.
+  const linkFn = CMD.commands && CMD.commands.link;
+  if (typeof linkFn !== 'function') {
+    cmdProblems.push('link is not a function');
+  } else {
+    const url = 'https://x';
+    const wrapped = linkFn({ doc: 'abc', from: 0, to: 3, selected: 'abc' }, url);
+    const inserted = wrapped.changes.insert;
+    if (inserted !== '[abc](' + url + ')') {
+      cmdProblems.push(`link with a selection inserted ${JSON.stringify(inserted)}`);
+    } else {
+      // Slicing the inserted text by the returned selection is the assertion:
+      // it fails unless the selection really spans the URL.
+      const picked = inserted.slice(wrapped.selection.anchor, wrapped.selection.head);
+      if (picked !== url) {
+        cmdProblems.push(
+          `link did not select the URL: ${JSON.stringify(wrapped.selection)} picks ${JSON.stringify(picked)}`);
+      }
+    }
+    const labelled = linkFn({ doc: '', from: 0, to: 0, selected: '' }, url, 'Text');
+    if (labelled.changes.insert !== '[Text](' + url + ')') {
+      cmdProblems.push(`link without a selection inserted ${JSON.stringify(labelled.changes.insert)}`);
     }
   }
 }

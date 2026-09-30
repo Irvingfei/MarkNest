@@ -17,15 +17,6 @@
 (function (global) {
   'use strict';
 
-  function sliceLine(doc, from, to) {
-    var start = doc.lastIndexOf('\n', from - 1) + 1;
-    var end = doc.indexOf('\n', to);
-    if (end === -1) {
-      end = doc.length;
-    }
-    return { start: start, end: end, text: doc.slice(start, end) };
-  }
-
   function replace(from, to, insert, selection) {
     return {
       changes: { from: from, to: to, insert: insert },
@@ -88,53 +79,102 @@
 
   /* -------------------------------------------------------------- block */
 
-  /* Line commands share one shape too: strip any prefix this command would
-     apply, then apply it - which makes a second press a no-op instead of
-     stacking prefixes. */
-  function lineCommand(ctx, prefixes, apply) {
-    var line = sliceLine(ctx.doc, ctx.from, ctx.to);
-    var text = line.text;
-    var stripped = text;
-    var removed = false;
-
-    for (var i = 0; i < prefixes.length; i += 1) {
-      var prefix = prefixes[i];
-      if (stripped.slice(0, prefix.length) === prefix) {
-        stripped = stripped.slice(prefix.length);
-        removed = true;
-        break;
-      }
+  /* Line-start commands act on the lines the selection touches, not on the
+     selection as one string: selecting a paragraph and pressing the quote
+     button is how a paragraph gets quoted. The range is widened to whole line
+     boundaries first, so a selection ending mid-line still transforms that
+     line in full. */
+  function blockRange(doc, from, to) {
+    var start = doc.lastIndexOf('\n', from - 1) + 1;
+    var end = doc.indexOf('\n', to);
+    if (end === -1) {
+      end = doc.length;
     }
+    return { start: start, end: end, lines: doc.slice(start, end).split('\n') };
+  }
 
-    var next = removed ? stripped : apply(stripped);
-    var delta = next.length - text.length;
+  function isBlank(line) {
+    return line.trim() === '';
+  }
+
+  /* Whether the whole block loses its markers or gains them is decided once
+     for the block, not per line. Deciding per line would flip some lines up
+     while others flipped down inside the same mixed selection, which is not
+     something one press of one button asked for. A block with nothing but
+     blank lines toggles nothing rather than counting as "all marked". */
+  function allMarked(lines, carries) {
+    var marked = false;
+    for (var i = 0; i < lines.length; i += 1) {
+      if (isBlank(lines[i])) {
+        continue;
+      }
+      if (!carries(lines[i])) {
+        return false;
+      }
+      marked = true;
+    }
+    return marked;
+  }
+
+  function blockResult(range, ctx, text) {
+    var delta = text.length - (range.end - range.start);
     return {
-      changes: { from: line.start, to: line.end, insert: next },
+      changes: { from: range.start, to: range.end, insert: text },
       selection: {
-        anchor: Math.max(line.start, ctx.from + delta),
-        head: Math.max(line.start, ctx.to + delta)
+        anchor: Math.max(range.start, ctx.from + delta),
+        head: Math.max(range.start, ctx.to + delta)
       }
     };
+  }
+
+  function lineCommand(ctx, prefixes, apply) {
+    var range = blockRange(ctx.doc, ctx.from, ctx.to);
+    var matched = function (line) {
+      for (var i = 0; i < prefixes.length; i += 1) {
+        if (line.slice(0, prefixes[i].length) === prefixes[i]) {
+          return prefixes[i];
+        }
+      }
+      return '';
+    };
+    var removing = allMarked(range.lines, function (line) { return matched(line) !== ''; });
+    var text = range.lines.map(function (line) {
+      // A marker on an otherwise empty line is either a dangling list item or
+      // trailing whitespace; neither is what someone selecting a paragraph
+      // asked for, so blank lines never gain one.
+      if (isBlank(line)) {
+        return line;
+      }
+      var prefix = matched(line);
+      if (removing) {
+        return prefix ? line.slice(prefix.length) : line;
+      }
+      return prefix ? line : apply(line);
+    }).join('\n');
+    return blockResult(range, ctx, text);
   }
 
   var HEADING = /^#{1,6} /;
 
   function heading(ctx, level) {
     var hashes = new Array(level + 1).join('#') + ' ';
-    var line = sliceLine(ctx.doc, ctx.from, ctx.to);
-    var text = line.text;
-    var stripped = text.replace(HEADING, '');
-    // Pressing the same level again removes the heading; pressing a different
-    // level replaces it rather than stacking a second set of hashes.
-    var next = text.slice(0, hashes.length) === hashes ? stripped : hashes + stripped;
-    var delta = next.length - text.length;
-    return {
-      changes: { from: line.start, to: line.end, insert: next },
-      selection: {
-        anchor: Math.max(line.start, ctx.from + delta),
-        head: Math.max(line.start, ctx.to + delta)
+    var range = blockRange(ctx.doc, ctx.from, ctx.to);
+    var removing = allMarked(range.lines, function (line) {
+      // "Already at this level" means exactly this many hashes; a line at
+      // another level is not a reason to remove.
+      return line.slice(0, hashes.length) === hashes;
+    });
+    var text = range.lines.map(function (line) {
+      if (isBlank(line)) {
+        return line;
       }
-    };
+      // Stripping whatever level is present before applying this one is what
+      // makes pressing H2 on an H3 line replace the level rather than stack a
+      // second set of hashes.
+      var bare = line.replace(HEADING, '');
+      return removing ? bare : hashes + bare;
+    }).join('\n');
+    return blockResult(range, ctx, text);
   }
 
   function quote(ctx) { return lineCommand(ctx, ['> '], function (t) { return '> ' + t; }); }
@@ -147,9 +187,16 @@
   function task(ctx) {
     return lineCommand(ctx, ['- [ ] ', '- [x] '], function (t) { return '- [ ] ' + t; });
   }
+
+  /* Longest marker first. With `- ` ahead of the task markers, `- [ ] ` could
+     never match - the shorter prefix always won - and the unordered-list
+     button on a task item left the orphaned `[ ] ` behind, which is not a list
+     item in any renderer. The two task entries are here precisely so that a
+     task item counts as an unordered item and loses its whole marker. */
   function bullet(ctx) {
-    return lineCommand(ctx, ['- ', '- [ ] ', '- [x] '], function (t) { return '- ' + t; });
+    return lineCommand(ctx, ['- [ ] ', '- [x] ', '- '], function (t) { return '- ' + t; });
   }
+
   function numbered(ctx) {
     return lineCommand(ctx, ['1. '], function (t) { return '1. ' + t; });
   }
