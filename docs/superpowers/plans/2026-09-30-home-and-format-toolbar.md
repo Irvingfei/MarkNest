@@ -167,7 +167,77 @@ git commit -m "feat(index): list a user's notes by modification time"
 - Modify: `usr/local/marknest/lib/api.py`
 - Test: `tools/selftest.py`
 
-- [ ] **Step 1: 写失败的断言**
+- [ ] **Step 1: 先补上缺失的派发辅助函数**
+
+`tools/selftest.py` **没有** `request()`——它是模块级测试，完全不碰 HTTP。（初稿误以为它是既有设施；那是同仓库另一个应用的 selftest 有，本应用的没有。）补一个：
+
+```python
+def request(method, path, body=None, headers=None, user=USER):
+    """Dispatch one request in-process and return ``(status, envelope)``.
+
+    This is not the HTTP transport: the socket, keep-alive framing and multipart
+    decoding are exercised by the browser harnesses against a real server. What
+    this does exercise is everything between the request line and the response
+    body - path normalisation, the route table, identity resolution, the
+    response envelope and the error mapping. Those are pure logic, they are
+    where a missing route or a missing clamp goes wrong silently, and a browser
+    test that only looks at the screen would not notice either.
+    """
+    merged = {"Cookie": "tos_current_username=%s;" % user}
+    merged.update(headers or {})
+    raw = json.dumps(body).encode("utf-8") if body is not None else b""
+    hdrs = Headers(merged)
+    if body is not None:
+        hdrs.add("Content-Type", "application/json")
+        hdrs.add("Content-Length", str(len(raw)))
+    try:
+        status, payload = api.dispatch(
+            Request(method, path, "HTTP/1.1", hdrs, io.BytesIO(raw))
+        )
+    except MarkNestError as exc:
+        return exc.status, exc.to_payload()
+    if status == 204 or payload is None:
+        return status, None
+    return status, wrap_success(payload)
+```
+
+需要的 import 加到既有 import 区：
+
+```python
+import io
+import json
+
+from lib.api import api
+from lib.errors import MarkNestError
+from lib.http_util import Headers, Request, wrap_success
+```
+
+并把模块 docstring 第 5 行那句**说准**——原文是：
+
+```
+system accounts involved. The HTTP transport is covered by the browser harnesses;
+```
+
+改成：
+
+```
+system accounts involved. The HTTP transport - the socket, keep-alive framing
+and multipart decoding - is covered by the browser harnesses against a real
+server; request routing, the response envelope and parameter handling are
+asserted here through the dispatcher.
+```
+
+> 这不是放宽原有边界，而是把它说准：路由表和参数钳位本来就是纯逻辑，本该在离线套件里；浏览器测试反而看不见「路由漏接」。
+
+- [ ] **Step 2: 只加辅助函数，先跑一遍确认基线没被破坏**
+
+```bash
+python tools/selftest.py
+```
+
+预期：`passed: 56 failed: 0`（辅助函数尚无调用方）
+
+- [ ] **Step 3: 写失败的断言**
 
 在 `tools/selftest.py` 的 `test_recent()` 末尾追加（同一个函数里，因为它复用刚才建立的库）：
 
@@ -189,17 +259,17 @@ git commit -m "feat(index): list a user's notes by modification time"
           len((payload.get("data") or {}).get("recent") or []) <= 50, payload)
 ```
 
-> `request()` 是 `selftest.py` 里既有的辅助函数，签名 `request(method, path, body=None, headers=None) -> (status, payload)`。
-
-- [ ] **Step 2: 运行，确认失败**
+- [ ] **Step 4: 运行，确认失败**
 
 ```bash
 python tools/selftest.py
 ```
 
-预期：`GET /recent answers` FAIL，状态 404（`no such endpoint: /recent`）
+预期：`GET /recent answers` FAIL，状态 **404**（`no such endpoint: /recent`）
 
-- [ ] **Step 3: 实现**
+> **注意失败的形态**：`dispatch()` 在路由**之前**解析身份，所以调用方必须带上身份（辅助函数注入的 cookie）。少带身份会先撞上 `3013`（无法确定用户），看到 3013 说明辅助函数的身份注入没生效——**不是**「路由没实现」，别照着这个方向查。
+
+- [ ] **Step 5: 实现**
 
 在 `usr/local/marknest/lib/api.py` 的 `Api` 类里，`get_search` 之后加：
 
@@ -227,7 +297,7 @@ python tools/selftest.py
                 return 200, self.get_recent(request)
 ```
 
-- [ ] **Step 4: 运行，确认通过**
+- [ ] **Step 6: 运行，确认通过**
 
 ```bash
 python tools/selftest.py
@@ -235,11 +305,11 @@ python tools/selftest.py
 
 预期：`passed: 61 failed: 0`
 
-- [ ] **Step 5: 提交**
+- [ ] **Step 7: 提交**
 
 ```bash
 git add usr/local/marknest/lib/api.py tools/selftest.py
-git commit -m "feat(api): GET /recent for the home screen"
+git commit -m "feat(api): GET /recent, and an in-process dispatcher for the offline suite"
 ```
 
 ---
