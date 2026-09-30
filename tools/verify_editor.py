@@ -293,6 +293,31 @@ def main():
             # about the tree, so the note is addressed the way the application
             # itself addresses one.
             open_note_directly(page, "notes/long.md")
+
+            # The shortcut above had removed the only exercise of the tree's
+            # directory expansion: click_note is otherwise called for root-level
+            # notes only, so "expand a folder, then click the note inside it"
+            # was tested nowhere. The click path comes back here.
+            #
+            # What is asserted is the fetch the click causes, not the content:
+            # the editor already holds long.md from the shortcut, so reading it
+            # back would pass even if the click did nothing at all.
+            before = len(state["requests"])
+            click_note(page, "notes")
+            page.wait_for_timeout(600)
+            click_note(page, "long.md")
+            page.wait_for_timeout(900)
+            reopened = [r for r in state["requests"][before:]
+                        if r[1].endswith("/notes")
+                        and (r[2].get("path") or [""])[0] == "notes/long.md"]
+            check("expanding a folder and clicking a note in it opens that note",
+                  len(reopened) == 1, len(reopened))
+            # The first line rather than a later section: CodeMirror renders
+            # only the lines in view, and long.md is long enough that anything
+            # past the fold is not in the DOM to be read.
+            check("the editor holds the note the tree click opened", page.evaluate(
+                "() => { var cm = document.querySelector('.cm-content');"
+                " return !!cm && cm.textContent.indexOf('Long note') !== -1; }"))
             page.evaluate(
                 "() => { var s = document.querySelector('.cm-scroller'); s.scrollTop = s.scrollHeight / 2; s.dispatchEvent(new Event('scroll')); }")
             page.wait_for_timeout(400)

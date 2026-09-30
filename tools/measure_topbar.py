@@ -135,8 +135,15 @@ def main():
 
             # Open a note so the editor, the preview and their footers are all
             # populated; an empty layout is not the layout.
-            page.click('.tree-row:has(.tree-name:text-is("welcome.md"))')
-            page.wait_for_timeout(700)
+            #
+            # The note is addressed through the fragment rather than by clicking
+            # its row: the tree lives inside the workspace, and the application
+            # opens on the home screen, which hides it until a note is open. The
+            # fragment is the application's own way to name a note, so this
+            # reaches the same layout the click did.
+            page.evaluate(
+                "() => { location.hash = '#/notes?p=' + encodeURIComponent('welcome.md'); }")
+            page.wait_for_timeout(900)
 
             print("Scanning %d widths for controls inside the host's regions" % len(WIDTHS))
             print("-" * 62)
