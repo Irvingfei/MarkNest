@@ -79,11 +79,17 @@ def test_recent():
     paths = [row["path"] for row in rows]
     check("the newest note comes first", paths and paths[0] == "r/new.md", paths)
     check("an older note follows", "r/old.md" in paths, paths)
-    check("another user's note never appears", all(p.startswith("r/") for p in paths), paths)
+    # Isolation is asserted by naming the other user's note, not by a prefix
+    # test: `all(p.startswith("r/"))` is true for bob's "r/other.md" as well, so
+    # it would pass even with the `user = ?` filter removed. Bob's note is also
+    # created last, so a missing filter puts it first and this catches it.
+    check("another user's note never appears", "r/other.md" not in paths, paths)
     check("rows carry what the home screen shows",
           all(set(("path", "title", "mtime_ns", "size")) <= set(row) for row in rows), rows[:1])
     check("the limit is honoured", len(db.store.recent(USER, 1)) == 1)
 ```
+
+> 注意：`test_recent()` 与先前的测试**共用同一个库**，所以 `recent(USER, 10)` 会包含 Ali 早先建的笔记（`s/other.md` 等）。断言必须容忍这一点——这也是上面不能用前缀判断的原因之一。
 
 并在 `main()` 的调用序列里，把 `test_identity_validation()` 之前插入 `test_recent()`：
 
@@ -93,7 +99,7 @@ def test_recent():
         test_identity_validation()
 ```
 
-同时确认文件顶部已有 `import time`（`test_recent` 用得到）。
+同时在文件顶部加 `import time`——`tools/selftest.py` 原本**没有**这个 import，`test_recent` 需要它。
 
 - [ ] **Step 2: 运行，确认失败**
 
