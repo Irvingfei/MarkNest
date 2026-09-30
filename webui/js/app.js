@@ -223,10 +223,92 @@
   /* ------------------------------------------------------------------- boot */
 
   function bindShell() {
-    var newButton = document.getElementById('btn-new-note');
-    if (newButton) {
-      newButton.addEventListener('click', function () {
+    /* The application menu. It is a panel the shell owns rather than a
+       component of its own: it has one trigger, three items and no state worth
+       exporting, and the items call the same showHome()/newNote()/FilePicker
+       entry points every other control already goes through. */
+    var moreButton = document.getElementById('btn-more');
+    var moreMenu = document.getElementById('more-menu');
+
+    function closeMenu() {
+      if (!moreMenu || moreMenu.hidden) {
+        return;
+      }
+      moreMenu.hidden = true;
+      if (moreButton) {
+        moreButton.setAttribute('aria-expanded', 'false');
+      }
+      document.removeEventListener('mousedown', onOutside);
+      document.removeEventListener('keydown', onMenuKey);
+    }
+
+    function onOutside(event) {
+      var target = event && event.target;
+      // A press inside the menu, or on the button that owns it, is not
+      // "outside" and must not close the menu here. The browser decides a
+      // click's target from what is still on screen at the mouseup, so a menu
+      // hidden on the way down never receives the click: the item's own handler
+      // does not run, and 主页 reads as an inert row. Both close the menu
+      // themselves - the items through closeMenu(), the button by toggling.
+      if (target && ((moreMenu && moreMenu.contains(target)) ||
+                     (moreButton && moreButton.contains(target)))) {
+        return;
+      }
+      closeMenu();
+    }
+    function onMenuKey(event) {
+      if (event.key === 'Escape') {
+        closeMenu();
+        if (moreButton) { moreButton.focus(); }
+      }
+    }
+
+    if (moreButton && moreMenu) {
+      moreButton.addEventListener('click', function (event) {
+        event.stopPropagation();
+        if (!moreMenu.hidden) {
+          closeMenu();
+          return;
+        }
+        var box = moreButton.getBoundingClientRect();
+        moreMenu.style.left = Math.round(box.left) + 'px';
+        moreMenu.style.top = Math.round(box.bottom + 4) + 'px';
+        moreMenu.hidden = false;
+        moreButton.setAttribute('aria-expanded', 'true');
+        // Registered on the next tick so the click that opened the menu does
+        // not immediately close it.
+        global.setTimeout(function () {
+          document.addEventListener('mousedown', onOutside);
+          document.addEventListener('keydown', onMenuKey);
+        }, 0);
+      });
+    }
+
+    var moreHome = document.getElementById('more-home');
+    if (moreHome) {
+      moreHome.addEventListener('click', function () {
+        closeMenu();
+        showHome(true);
+      });
+    }
+    var moreNew = document.getElementById('more-new');
+    if (moreNew) {
+      moreNew.addEventListener('click', function () {
+        closeMenu();
         global.TreePane.newNote();
+      });
+    }
+    var moreOpen = document.getElementById('more-open');
+    if (moreOpen) {
+      moreOpen.addEventListener('click', function () {
+        closeMenu();
+        // Guarded because FilePicker arrives in a later task, and this item is
+        // clickable now: without the guard the throw leaves the item looking
+        // broken at the one moment it is presented as working. The neighbours
+        // stay unguarded - their modules are a real boot dependency.
+        if (global.FilePicker) {
+          global.FilePicker.open();
+        }
       });
     }
 

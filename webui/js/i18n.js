@@ -38,6 +38,11 @@
       'home.timeYesterday': '昨天',
       'home.timeDays': '{n} 天前',
 
+      'nav.home': '主页',
+      'nav.newNote': '新建文件',
+      'nav.openNote': '打开文件',
+      'nav.more': '更多',
+
       'tree.ariaLabel': '笔记目录树',
       'tree.newNoteTitle': '新建笔记',
       'tree.refreshTitle': '刷新目录树',
@@ -154,6 +159,11 @@
       'home.timeYesterday': '昨天',
       'home.timeDays': '{n} 天前',
 
+      'nav.home': '首頁',
+      'nav.newNote': '新增檔案',
+      'nav.openNote': '開啟檔案',
+      'nav.more': '更多',
+
       'tree.ariaLabel': '筆記目錄樹',
       'tree.newNoteTitle': '新增筆記',
       'tree.refreshTitle': '重新整理目錄樹',
@@ -269,6 +279,11 @@
       'home.timeHours': '{n} h ago',
       'home.timeYesterday': 'yesterday',
       'home.timeDays': '{n} d ago',
+
+      'nav.home': 'Home',
+      'nav.newNote': 'New file',
+      'nav.openNote': 'Open file',
+      'nav.more': 'More',
 
       'tree.ariaLabel': 'Note tree',
       'tree.newNoteTitle': 'New note',

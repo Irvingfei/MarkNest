@@ -722,6 +722,37 @@ html, body {
 .ctx-item.is-danger { color: var(--danger); }
 .ctx-item.is-danger:hover { background: var(--danger-soft); }
 
+/* --------------------------------------------------------- application menu */
+
+/* The application menu, anchored under the toolbar button rather than at the
+   pointer: it is a menu of the application, not of whatever was clicked. */
+.menu {
+  position: fixed;
+  z-index: 60;
+  min-width: 148px;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+}
+.menu[hidden] { display: none; }
+
+.menu-item {
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  color: var(--text);
+  background: none;
+  border: none;
+  border-radius: 5px;
+  padding: 7px 10px;
+  cursor: pointer;
+}
+.menu-item:hover { background: var(--surface-2); }
+
 /* ------------------------------------------------------------- narrow widths */
 
 /* Collapse progressively rather than squeezing three panes into a frame that

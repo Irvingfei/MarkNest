@@ -199,6 +199,35 @@ def main():
                       "() => !document.getElementById('workspace').classList.contains('is-home')"),
                   "" if items else "no recent item to click")
 
+            print("\n1f. the more menu")
+            check("the menu is closed until asked for", not page.is_visible("#more-menu"))
+            page.click("#btn-more")
+            page.wait_for_timeout(300)
+            check("pressing it opens the menu", page.is_visible("#more-menu"))
+            items = page.inner_text("#more-menu")
+            for expected in ("主页", "新建文件", "打开文件"):
+                check("the menu offers %s" % expected, expected in items, items[:120])
+            check("the old plus button is gone", page.evaluate(
+                "() => !document.getElementById('btn-new-note')"))
+            page.keyboard.press("Escape")
+            page.wait_for_timeout(200)
+            check("escape closes it", not page.is_visible("#more-menu"))
+
+            # Spec §11 item 5. The home screen is reachable from the note view
+            # only through this menu item, so this is the one place the two
+            # halves of the state machine meet a real gesture.
+            open_note_directly(page, "welcome.md")
+            check("a note is open before the menu is used again", page.evaluate(
+                "() => !document.getElementById('workspace').classList.contains('is-home')"))
+            page.click("#btn-more")
+            page.wait_for_timeout(300)
+            page.click("#more-home")
+            page.wait_for_timeout(600)
+            check("the menu's home item returns to the home screen", page.evaluate(
+                "() => document.getElementById('workspace').classList.contains('is-home')"))
+            check("and the fragment says so", page.evaluate("() => location.hash") == "#/home",
+                  page.evaluate("() => location.hash"))
+
             print("\n2. opening a note")
             # Section 2 is about the click path, so the note that is already
             # open has to be there for the click to be a switch between notes -

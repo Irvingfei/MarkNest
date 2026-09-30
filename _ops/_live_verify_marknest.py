@@ -161,7 +161,7 @@ def main():
 
         print("\n5. create a note, edit it, and watch the preview follow")
         try:
-            app.wait_for_selector("#btn-new-note", timeout=30000)
+            app.wait_for_selector("#btn-more", timeout=30000)
         except Exception:  # noqa: BLE001
             shot(page, "_mn_13_stuck.png")
             print("   the toolbar never appeared; frame html follows")
@@ -174,7 +174,13 @@ def main():
         # correct behaviour, and a useless test.
         note_name = "selftest-%d.md" % int(time.time())
         app.evaluate("(name) => { window.prompt = () => name; }", note_name)
-        app.click("#btn-new-note")
+        # The ＋ button is gone; creating a note is now the ☰ menu's 新建文件,
+        # which reaches the same TreePane.newNote() the button called. Opening
+        # the menu first is what a person does, so the create is exercised
+        # through the route that will exist rather than a removed one.
+        app.click("#btn-more")
+        app.wait_for_selector("#more-menu", timeout=30000)
+        app.click("#more-new")
         page.wait_for_timeout(3000)
         current = app.evaluate("() => (document.getElementById('current-path')||{}).textContent")
         check("the note was created and opened", note_name in (current or ""), current)

@@ -21,6 +21,12 @@
 <div class="app" id="app">
 
   <header class="topbar">
+    <button type="button" class="btn btn-icon" id="btn-more"
+            data-i18n-title="nav.more" title="更多"
+            aria-haspopup="true" aria-expanded="false" aria-controls="more-menu">
+      <span aria-hidden="true">☰</span>
+    </button>
+
     <div class="brand">
       <img class="brand-icon" src="icons/marknest.svg" alt="" aria-hidden="true">
       <span class="brand-title" data-i18n="app.name">MarkNest 笔记</span>
@@ -28,10 +34,6 @@
     </div>
 
     <nav class="actions" id="topbar-actions">
-      <button type="button" class="btn btn-icon" id="btn-new-note"
-              data-i18n-title="tree.newNoteTitle" title="新建笔记">
-        <span aria-hidden="true">＋</span>
-      </button>
       <button type="button" class="btn" id="btn-save" disabled
               data-i18n="editor.save">保存</button>
       <button type="button" class="btn" id="btn-preview-toggle" aria-pressed="true"
@@ -110,6 +112,19 @@
     <span class="status-sep" aria-hidden="true">·</span>
     <span class="status" id="index-status"></span>
   </footer>
+
+  <!-- The application menu. It lives outside the topbar's flow - the panel is
+       position:fixed and is placed under the button by app.js - so that it is
+       not clipped by the host's own band and does not push the topbar's row
+       around while it is open. -->
+  <div class="menu" id="more-menu" role="menu" hidden>
+    <button type="button" class="menu-item" id="more-home" role="menuitem"
+            data-i18n="nav.home">主页</button>
+    <button type="button" class="menu-item" id="more-new" role="menuitem"
+            data-i18n="nav.newNote">新建文件</button>
+    <button type="button" class="menu-item" id="more-open" role="menuitem"
+            data-i18n="nav.openNote">打开文件</button>
+  </div>
 
 </div>
 
