@@ -18,6 +18,12 @@ that still reserves those regions, and it also catches the failure mode this
 file exists for, which is a container that is *mostly* clear with one control
 peeking into the band.
 
+The scan runs over both view states - the home screen and an open note - because
+each brings controls the other does not have: the home screen's two large
+actions and its recent list, the format bar's buttons once a note is open. Each
+round first checks that the state it claims is the state on screen, so a routing
+change that left both rounds on the same screen cannot pass as two clean rounds.
+
 The earlier defect that produced this approach had two halves: a toolbar whose
 gutter was guessed from a screenshot (48-98px guessed, 141px actual), and a
 single element that stretched to the right edge under the host's window buttons.
@@ -133,34 +139,52 @@ def main():
             page = context.new_page()
             H.boot_page(page, url)
 
-            # Open a note so the editor, the preview and their footers are all
-            # populated; an empty layout is not the layout.
+            # Both states get scanned: the home screen has its own buttons and
+            # the format bar only exists once a note is open, so a scan of one
+            # state says nothing about the other. A run that measured the same
+            # state twice would report sixteen clean lines and mean eight.
             #
-            # The note is addressed through the fragment rather than by clicking
-            # its row: the tree lives inside the workspace, and the application
-            # opens on the home screen, which hides it until a note is open. The
-            # fragment is the application's own way to name a note, so this
-            # reaches the same layout the click did.
-            page.evaluate(
-                "() => { location.hash = '#/notes?p=' + encodeURIComponent('welcome.md'); }")
-            page.wait_for_timeout(900)
-
-            print("Scanning %d widths for controls inside the host's regions" % len(WIDTHS))
+            # The note state is entered through the fragment rather than by
+            # clicking a tree row: on the home screen the workspace - and the
+            # tree inside it - is hidden, so that click would land on an element
+            # the user cannot see. The fragment is the application's own way to
+            # name a note, so it reaches the same layout the click did.
+            print("Scanning %d widths in both the home and note states" % len(WIDTHS))
             print("-" * 62)
-            for width in WIDTHS:
-                page.set_viewport_size({"width": width, "height": 720})
-                page.wait_for_timeout(350)
-                elements = page.evaluate(SCAN_JS)
-                zones = reserved(width, 720)
-                intrusions = []
-                for item in elements:
-                    for name, zone in zones:
-                        if intersects(item["box"], zone):
-                            intrusions.append("%s %r" % (item["tag"], item["label"]))
-                            break
-                check("%4dpx: %2d interactive element(s), 0 in a host region"
-                      % (width, len(elements)), not intrusions,
-                      intrusions[:4])
+            for state_name in ("home", "note"):
+                if state_name == "note":
+                    page.evaluate(
+                        "() => { location.hash = '#/notes?p=' + encodeURIComponent('welcome.md'); }")
+                else:
+                    page.evaluate("() => { location.hash = '#/home'; }")
+                page.wait_for_timeout(900)
+
+                # The two rounds are indistinguishable in the output unless the
+                # state each one claims is checked, and a routing change that
+                # left both rounds on the same screen would otherwise turn this
+                # tool into a measurement of nothing twice. setView() publishes
+                # the state as a class on the workspace, so it is read back here
+                # rather than inferred from the elements that were found.
+                is_home = page.evaluate(
+                    "() => document.getElementById('workspace').classList.contains('is-home')")
+                check("%s state is really %s" % (state_name, state_name),
+                      is_home == (state_name == "home"),
+                      page.evaluate("() => location.hash"))
+
+                for width in WIDTHS:
+                    page.set_viewport_size({"width": width, "height": 720})
+                    page.wait_for_timeout(350)
+                    elements = page.evaluate(SCAN_JS)
+                    zones = reserved(width, 720)
+                    intrusions = []
+                    for item in elements:
+                        for name, zone in zones:
+                            if intersects(item["box"], zone):
+                                intrusions.append("%s %r" % (item["tag"], item["label"]))
+                                break
+                    check("%-4s %4dpx: %2d element(s), 0 in a host region"
+                          % (state_name, width, len(elements)), not intrusions,
+                          intrusions[:4])
 
             # The rule is not "the band is exactly 46px" but "nothing is in it",
             # yet the top bar's own content still has to start below it or the
@@ -188,8 +212,8 @@ def main():
         print("FAILED: %s" % ", ".join(failures))
         return 1
     print("PASSED: no interactive control enters the host's top band, bottom strip")
-    print("        or resize grip, at any width from %d to %d."
-          % (WIDTHS[-1], WIDTHS[0]))
+    print("        or resize grip, in the home or the note state, at any width")
+    print("        from %d to %d." % (WIDTHS[-1], WIDTHS[0]))
     return 0
 
 
