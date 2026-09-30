@@ -324,6 +324,40 @@ for (const [moduleName, members] of Object.entries(REQUIRED)) {
 
 /* --------------------------------------------------------- vendor bundle */
 
+/* The matcher is built here, once, and the decoy assertions below call this
+ * function rather than restating the pattern. A copy would let the tests keep
+ * passing while the checker they describe had drifted - which is the failure
+ * they exist to rule out. */
+function exportedNamePattern(member) {
+  // The minifier emits one of three shapes depending on how the literal
+  // survives: an object-literal property (`{ render: fn }`), an assignment
+  // (`X.render = fn`), or a method in an object literal
+  // (`applyEdit(command) { ... }`). All three are accepted rather than pinning
+  // one, because which one appears is a property of the bundler version and
+  // not of the application.
+  //
+  // The third shape is the only one an *instance* method can take. `create`
+  // and `render` reach the module namespace and so are emitted as assignments,
+  // but `applyEdit` is returned from `create()` and never leaves the object
+  // literal. Its leading character is pinned to `{` or `,` - the two that can
+  // precede an object-literal method in the emitted bundle - because a `\s`
+  // there would also admit a call site followed by a block, a standalone
+  // function declaration, or a comment. The brace after the parameter list is
+  // required for the same reason: a bare call must not satisfy the check.
+  //
+  // Two limitations are known and accepted. The `{` lead still admits a class
+  // method (`class Foo{applyEdit(a){}}`), and it cannot be dropped, because an
+  // object literal whose first member is the method begins `return{applyEdit(o){`.
+  // And this is a text-presence test even for the module exports: deleting
+  // `Ur.create=jP` alone would still pass, since unrelated `.create=`
+  // occurrences satisfy the first alternative. Pinning the minified emission
+  // line would be more fragile than the gap it closes.
+  return new RegExp(
+    '[.\\s{;,]' + member + '\\s*[:=]' +
+    '|[{,]' + member + '\\s*\\([^)]*\\)\\s*\\{'
+  );
+}
+
 /* The editor bundle is a committed build artefact, so the two ways it can be
  * wrong are "not built" and "built from older sources". The second is caught by
  * the source hash in tools/webui_build.py; this catches the first, and checks
@@ -335,32 +369,36 @@ if (!fs.existsSync(vendorPath)) {
 } else {
   const bundle = fs.readFileSync(vendorPath, 'utf8');
   for (const member of VENDOR_SURFACE) {
-    // The minifier emits one of three shapes depending on how the literal
-    // survives: an object-literal property (`{ render: fn }`), an assignment
-    // (`X.render = fn`), or a method in an object literal
-    // (`applyEdit(command) { ... }`). All three are accepted rather than
-    // pinning one, because which one appears is a property of the bundler
-    // version and not of the application.
-    //
-    // The third shape is the only one an *instance* method can take. `create`
-    // and `render` reach the module namespace and so are emitted as
-    // assignments, but `applyEdit` is returned from `create()` and never
-    // leaves the object literal. Its leading character is pinned to `{` or
-    // `,` - the two that can precede an object-literal method in the emitted
-    // bundle - because a `\s` there would also admit a call site followed by
-    // a block, a standalone function declaration, or a comment. The brace
-    // after the parameter list is required for the same reason: a bare call
-    // must not satisfy the check.
-    const exported = new RegExp(
-      '[.\\s{;,]' + member + '\\s*[:=]' +
-      '|[{,]' + member + '\\s*\\([^)]*\\)\\s*\\{'
-    );
-    if (!exported.test(bundle)) {
+    if (!exportedNamePattern(member).test(bundle)) {
       vendorProblems.push(`${VENDOR} does not appear to export ${member}`);
     }
   }
   if (!/MDEditor/.test(bundle)) {
     vendorProblems.push(`${VENDOR} does not define the MDEditor global`);
+  }
+
+  /* Every assertion above runs against the real bundle, which contains the
+   * real export - so a matcher that accepts everything passes all of them.
+   * The widened object-literal form was exactly that loose once, and a person
+   * reading the regex found it while nothing here did. These cases pin the
+   * discrimination itself, in both directions: a matcher that rejects
+   * everything fails the last one. */
+  const DECOYS = [
+    'view.applyEdit(s)\n{}',
+    'function applyEdit(a){}',
+    '/* obj.applyEdit(x){ */',
+    '// obj.applyEdit(x){',
+    '"obj.applyEdit(x){"'
+  ];
+  for (const decoy of DECOYS) {
+    if (exportedNamePattern('applyEdit').test(decoy)) {
+      vendorProblems.push(
+        `the surface matcher accepts a decoy: ${JSON.stringify(decoy)}`
+      );
+    }
+  }
+  if (!exportedNamePattern('applyEdit').test('return{view:s,applyEdit(o){c}')) {
+    vendorProblems.push('the surface matcher rejects the real emission shape');
   }
 }
 

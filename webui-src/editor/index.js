@@ -206,13 +206,33 @@ export function create(parent, options) {
     /**
      * Apply a change produced by a pure command function.
      *
-     * Everything that edits the document goes through here, and that is the
-     * point: a change dispatched as a CodeMirror transaction lands in the undo
-     * history, notifies the update listener that drives the dirty flag and the
-     * preview, and cannot leave the view and the state disagreeing. Writing to
-     * the DOM instead would break all three at once.
+     * This is the entry point for commands that *edit* the document, which is
+     * narrower than every method that touches the view: `setValue` replaces a
+     * whole document and carries its own selection semantics, and
+     * `setReadOnly` dispatches an effect with no change at all, so neither
+     * belongs here.
+     *
+     * One entry point is the point: a change dispatched as a CodeMirror
+     * transaction lands in the undo history, notifies the update listener that
+     * drives the dirty flag and the preview, and cannot leave the view and the
+     * state disagreeing. Writing to the DOM instead would break all three at
+     * once.
+     *
+     * `command` receives `{doc, from, to, selected}` describing the current
+     * selection and returns `{changes, selection}`: a CodeMirror change spec
+     * in absolute offsets, plus an optional selection to leave behind. A
+     * result carrying no `changes` is ignored and focuses nothing - defensive
+     * only, since every command is expected to return one.
      */
     applyEdit(command) {
+      // `EditorState.readOnly` gates user input, not transactions - `setValue`
+      // depends on exactly that - so without this guard a format button on a
+      // note the user cannot write would still edit it, light the dirty flag,
+      // and then have its save refused. The guard sits at the entry point
+      // rather than in the toolbar so that a caller added later cannot omit it.
+      if (view.state.readOnly) {
+        return;
+      }
       const main = view.state.selection.main;
       const result = command({
         doc: view.state.doc.toString(),
