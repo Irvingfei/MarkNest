@@ -340,6 +340,27 @@ git commit -m "feat(api): GET /recent, and an in-process dispatcher for the offl
 const VENDOR_SURFACE = ['create', 'render', 'applyEdit'];
 ```
 
+**同时必须加宽匹配器**——否则这一步的 `PASSED` 永远达不到。
+
+现有匹配器只认两种形态：`{ render: fn }`（`name\s*[:=]`）和赋值式 `X.render = fn`。`create` 与 `render` 是**模块级导出**，esbuild 把 IIFE 发成 `Ur.create=jP,Ur.render=ZP`；而 `applyEdit` 是 `create()` **返回的实例方法**，永远不会进入模块命名空间，esbuild 把它发成对象字面量简写 `,applyEdit(o){`。**简写不属于上面任何一种形态。**
+
+这不是偶发：**这个列表混装了模块导出与实例方法，此后往里加的任何实例方法都匹配不上。** 把模式加宽到接受第三种形态，并要求参数表后面必须跟 `{`——这样像 `view.applyEdit(state)` 这样的**调用点**不会自己把校验糊弄过去：
+
+```js
+      '[.\\s{;,]' + member + '\\s*[:=]' +
+      '|[.\\s{;,]' + member + '\\s*\\([^)]*\\)\\s*\\{'
+```
+
+**加宽后必须验证它不是空转**——拿变更前的 bundle 回放（`git show HEAD~:webui/js/vendor.editor.js`）：
+
+| 名字 | 旧模式 | 新模式 | 期望 |
+|---|---|---|---|
+| `create` | true | true | 都是模块导出，两种都该匹配 |
+| `render` | true | true | 同上 |
+| `applyEdit` | **false** | **true** | 只有新模式能认出方法简写 |
+
+`applyEdit` 那一行是关键的：旧模式在**新** bundle 上返回 false（所以计划照抄会失败），新模式在**旧** bundle 上返回 false（所以它不是恒真）。两边的 false 都验过，才说明它真的在测东西。
+
 > **不往 `tools/verify_editor.py` 里加。** 初稿在那里写了一条 `app_note_open(page) and ...`——`app_note_open` 这个辅助函数并不存在，而且那条断言检查的是 `MDEditor.create` 而不是 `applyEdit`，即使跑起来也没验到点上。导出面是**静态事实**，用静态检查即可；真正的行为断言（改了文档之后脏标记亮起）在 Task 5，那一步才需要浏览器。
 
 - [ ] **Step 2: 运行，确认失败**
