@@ -116,6 +116,20 @@
     return marked;
   }
 
+  /* An all-blank block is where a construct gets started: the cursor is on the
+     empty line and the button is meant to put the marker there. A blank line
+     *inside* a block is a different thing - a marker on it is a dangling item
+     or trailing whitespace - so the two cases are told apart rather than
+     lumped together. */
+  function allBlank(lines) {
+    for (var i = 0; i < lines.length; i += 1) {
+      if (!isBlank(lines[i])) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   function blockResult(range, ctx, text) {
     var delta = text.length - (range.end - range.start);
     return {
@@ -138,18 +152,16 @@
       return '';
     };
     var removing = allMarked(range.lines, function (line) { return matched(line) !== ''; });
-    var text = range.lines.map(function (line) {
-      // A marker on an otherwise empty line is either a dangling list item or
-      // trailing whitespace; neither is what someone selecting a paragraph
-      // asked for, so blank lines never gain one.
-      if (isBlank(line)) {
-        return line;
-      }
+    var empty = allBlank(range.lines);
+    var text = range.lines.map(function (line, index) {
       var prefix = matched(line);
       if (removing) {
         return prefix ? line.slice(prefix.length) : line;
       }
-      return prefix ? line : apply(line);
+      if (!isBlank(line)) {
+        return prefix ? line : apply(line);
+      }
+      return index === 0 && empty ? apply(line) : line;
     }).join('\n');
     return blockResult(range, ctx, text);
   }
@@ -164,15 +176,16 @@
       // another level is not a reason to remove.
       return line.slice(0, hashes.length) === hashes;
     });
-    var text = range.lines.map(function (line) {
-      if (isBlank(line)) {
-        return line;
+    var empty = allBlank(range.lines);
+    var text = range.lines.map(function (line, index) {
+      if (!isBlank(line)) {
+        // Stripping whatever level is present before applying this one is what
+        // makes pressing H2 on an H3 line replace the level rather than stack a
+        // second set of hashes.
+        var bare = line.replace(HEADING, '');
+        return removing ? bare : hashes + bare;
       }
-      // Stripping whatever level is present before applying this one is what
-      // makes pressing H2 on an H3 line replace the level rather than stack a
-      // second set of hashes.
-      var bare = line.replace(HEADING, '');
-      return removing ? bare : hashes + bare;
+      return index === 0 && empty ? hashes + line : line;
     }).join('\n');
     return blockResult(range, ctx, text);
   }

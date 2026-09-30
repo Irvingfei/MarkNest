@@ -386,6 +386,14 @@ if (!CMD) {
     // concludes it is already quoted, and strips instead of adding.
     ['quote adds to the lines that lack it', 'quote',
       { doc: '> a\nb', from: 0, to: 5, selected: '> a\nb' }, '> a\n> b'],
+    // A blank line is skipped inside a block, but an all-blank block is the
+    // place someone starts a construct: the cursor is there, and pressing the
+    // button has to do something.
+    ['a quote starts on an empty line', 'quote',
+      { doc: '', from: 0, to: 0, selected: '' }, '> '],
+    // The other direction, so the blank-line rule cannot quietly disappear.
+    ['a blank line inside the block is left alone', 'bullet',
+      { doc: 'a\n\nb', from: 0, to: 4, selected: 'a\n\nb' }, '- a\n\n- b'],
     // bullet must recognise a task item as an unordered item and remove the
     // whole marker. A substring check alone cannot see this: 'buy milk' IS a
     // substring of the broken '[ ] buy milk', so the case needs a forbidden
@@ -427,6 +435,23 @@ if (!CMD) {
     const twice = fn({ doc: applied, from: 0, to: applied.length, selected: applied });
     if (twice.changes.insert !== 'a\nb') {
       cmdProblems.push(`multi-line toggle-off: ${name} produced ${JSON.stringify(twice.changes.insert)} on the second press`);
+    }
+  }
+  // The all-blank block, in both directions. Neither toggle loop above can
+  // reach it: both start from a document with text in it. Pressing quote on an
+  // empty note has to put the marker where the cursor is, and pressing it again
+  // has to take the marker away rather than leaving a stray '> ' behind.
+  const emptyQuote = CMD.commands && CMD.commands.quote;
+  if (typeof emptyQuote === 'function') {
+    const opened = emptyQuote({ doc: '', from: 0, to: 0, selected: '' }).changes.insert;
+    if (opened !== '> ') {
+      cmdProblems.push(`quote on an empty document produced ${JSON.stringify(opened)} instead of '> '`);
+    } else {
+      const closed = emptyQuote({ doc: opened, from: opened.length, to: opened.length, selected: '' })
+        .changes.insert;
+      if (closed !== '') {
+        cmdProblems.push(`quote on '> ' produced ${JSON.stringify(closed)} instead of ''`);
+      }
     }
   }
   // link is the one command that takes arguments beyond ctx, so it is asserted
