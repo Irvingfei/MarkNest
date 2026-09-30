@@ -380,6 +380,12 @@ if (!CMD) {
       { doc: 'a\nb', from: 0, to: 3, selected: 'a\nb' }, '- a\n- b'],
     ['numbered covers every selected line', 'numbered',
       { doc: 'a\nb', from: 0, to: 3, selected: 'a\nb' }, '1. a\n1. b'],
+    // A block where only some lines carry the marker is the case where the
+    // all-or-nothing rule and a treat-the-block-as-one-line implementation
+    // actually disagree: the latter sees the block begin with the marker,
+    // concludes it is already quoted, and strips instead of adding.
+    ['quote adds to the lines that lack it', 'quote',
+      { doc: '> a\nb', from: 0, to: 5, selected: '> a\nb' }, '> a\n> b'],
     // bullet must recognise a task item as an unordered item and remove the
     // whole marker. A substring check alone cannot see this: 'buy milk' IS a
     // substring of the broken '[ ] buy milk', so the case needs a forbidden
