@@ -786,6 +786,15 @@ git add webui/js/mdcmd.js tools/webui_check.js
 git commit -m "feat(editor): pure markdown commands, asserted without a browser"
 ```
 
+> **上面的代码块是评审前的初稿，不是最终实现。** 它以现状引入 `mdcmd.js`，评审逐条指出了下面这些问题并已修正；读代码请以 `webui/js/mdcmd.js` 为准。
+>
+> - `sliceLine` 只算一行，行首类命令（引用、三级标题、任务、无序、有序）对多行选区只改第一行。已改为处理选区覆盖的每一行，方向整块一致（全加或全去，不逐行翻转），块内空行不动；整块全空是例外，标记落在第一行，否则光标停在空行上按按钮等于没反应。
+> - 端点位移按整块增减量算，两行以上会把选区推到块尾，再点一次无法撤销。非光标时已改为直接返回整块选区。
+> - 块首用 `lastIndexOf('\n', from - 1)` 取，JavaScript 把负下标钳到 0：首字符是换行的文档会跳过第一行，光标在 0 时还给出倒置区间（CodeMirror 会拒绝该 transaction）。`from === 0` 已单独处理。
+> - `bullet` 的前缀表把 `- ` 排在两个任务标记之前，后两者永远匹配不到，任务项会被留下半个 `[ ] `。已改为长者在前。
+> - `codeblock` 的无选区分支漏了 `lead`，`table` 漏了 `tail`，围栏与表格会跟上下文粘在同一行。
+> - 断言覆盖以 `tools/webui_check.js` 为准：切换语义有两轮往返（整块与部分选区）、光标位置、空文档、首字符换行的区间，以及各命令的正反向。`codeblock`、`link`、`table` 是只插入不撤销——这是 §6 的读法而非遗漏，设计文档已补注。
+
 ---
 
 ## Task 5: `formatbar.js` —— 按钮接到命令上
