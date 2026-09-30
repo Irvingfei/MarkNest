@@ -85,7 +85,12 @@
      boundaries first, so a selection ending mid-line still transforms that
      line in full. */
   function blockRange(doc, from, to) {
-    var start = doc.lastIndexOf('\n', from - 1) + 1;
+    // from === 0 is checked rather than left to lastIndexOf, because a negative
+    // fromIndex is clamped to 0: on a document whose first character is a
+    // newline that would match the newline at index 0 and start the block one
+    // character in, skipping the empty first line. With `from` here the search
+    // is only ever reached with a non-negative index.
+    var start = from === 0 ? 0 : doc.lastIndexOf('\n', from - 1) + 1;
     var end = doc.indexOf('\n', to);
     if (end === -1) {
       end = doc.length;

@@ -454,6 +454,34 @@ if (!CMD) {
       }
     }
   }
+  // The leading-newline inputs cannot be asserted through `cases`. For an
+  // insertion at the cursor the inserted text is the marker alone - identical
+  // both before and after the fix - so the substring check is blind to what
+  // went wrong, which is where the change starts. `lastIndexOf('\n', -1)`
+  // clamps its negative index to 0 in JavaScript, so a document whose first
+  // character is a newline matched that newline and began the block one
+  // character in: the empty first line was skipped, and with the cursor at
+  // offset 0 the range came back inverted, which CodeMirror rejects outright.
+  // The resulting document and the range are asserted directly instead.
+  const blockFn = CMD.commands && CMD.commands.quote;
+  if (typeof blockFn === 'function') {
+    const leading = [
+      ['a leading newline does not shift the block', '\nx'],
+      ['an all-newline document still gets a marker', '\n\n']
+    ];
+    for (const [label, doc] of leading) {
+      const change = blockFn({ doc: doc, from: 0, to: 0, selected: '' }).changes;
+      if (change.from > change.to) {
+        cmdProblems.push(`${label}: inverted range, from ${change.from} to ${change.to}`);
+        continue;
+      }
+      const result = doc.slice(0, change.from) + change.insert + doc.slice(change.to);
+      if (result !== '> ' + doc) {
+        cmdProblems.push(
+          `${label}: document became ${JSON.stringify(result)} instead of ${JSON.stringify('> ' + doc)}`);
+      }
+    }
+  }
   // link is the one command that takes arguments beyond ctx, so it is asserted
   // separately. The design requires the URL portion to come back selected, so
   // the person can retype the address without selecting it by hand - a
