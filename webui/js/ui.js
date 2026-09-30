@@ -146,17 +146,6 @@
     return el('span', { class: 'badge badge-' + kind, text: text });
   }
 
-  function statusBadge(status) {
-    var map = {
-      success: ['ok', I18N.t('jobs.statusSuccess')],
-      failed: ['bad', I18N.t('jobs.statusFailed')],
-      printing: ['run', I18N.t('jobs.statusPrinting')],
-      pending: ['idle', I18N.t('jobs.statusPending')]
-    };
-    var entry = map[status] || ['idle', status || I18N.t('common.unknown')];
-    return badge(entry[0], entry[1]);
-  }
-
   function formatBytes(bytes) {
     var value = Number(bytes) || 0;
     if (value < 1024) {
@@ -212,7 +201,6 @@
     hintNode: hintNode,
     skeleton: skeleton,
     badge: badge,
-    statusBadge: statusBadge,
     formatBytes: formatBytes,
     formatDateTime: formatDateTime,
     escapeHtml: escapeHtml,

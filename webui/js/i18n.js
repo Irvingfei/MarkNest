@@ -44,7 +44,6 @@
       'nav.more': '更多',
 
       'tree.ariaLabel': '笔记目录树',
-      'tree.newNoteTitle': '新建笔记',
       'tree.refreshTitle': '刷新目录树',
       'tree.empty': '还没有笔记，点上方「☰」新建一篇',
       'tree.unsupported': '非笔记文件',
@@ -122,6 +121,7 @@
       'err.timeout': '请求超时',
       'err.http': '服务返回了错误（HTTP {status}）',
       'err.session': '登录状态已失效，正在返回登录页…',
+      'err.code1000': '服务内部错误，请稍后重试',
       'err.code1400': '请求参数不合法',
       'err.code1401': '登录状态已失效，请重新登录',
       'err.code1404': '请求的资源不存在',
@@ -173,7 +173,6 @@
       'nav.more': '更多',
 
       'tree.ariaLabel': '筆記目錄樹',
-      'tree.newNoteTitle': '新增筆記',
       'tree.refreshTitle': '重新整理目錄樹',
       'tree.empty': '還沒有筆記，點上方「☰」新增一篇',
       'tree.unsupported': '非筆記檔案',
@@ -251,6 +250,7 @@
       'err.timeout': '請求逾時',
       'err.http': '服務回傳了錯誤（HTTP {status}）',
       'err.session': '登入狀態已失效，正在返回登入頁…',
+      'err.code1000': '服務內部錯誤，請稍後重試',
       'err.code1400': '請求參數不合法',
       'err.code1401': '登入狀態已失效，請重新登入',
       'err.code1404': '請求的資源不存在',
@@ -302,7 +302,6 @@
       'nav.more': 'More',
 
       'tree.ariaLabel': 'Note tree',
-      'tree.newNoteTitle': 'New note',
       'tree.refreshTitle': 'Refresh the tree',
       'tree.empty': 'No notes yet — use ☰ above to create one',
       'tree.unsupported': 'Not a note',
@@ -380,6 +379,7 @@
       'err.timeout': 'The request timed out',
       'err.http': 'The service answered with an error (HTTP {status})',
       'err.session': 'Your session expired, returning to the sign-in page…',
+      'err.code1000': 'The service hit an internal error, please try again',
       'err.code1400': 'The request was not valid',
       'err.code1401': 'Your session expired, please sign in again',
       'err.code1404': 'That resource does not exist',

@@ -6,6 +6,10 @@
  * exports. A typo such as `UI.apply` when only `I18N.apply` exists is caught
  * here instead of surfacing as a blank page inside the TOS iframe.
  *
+ * It also cross-checks the translation tables both ways: a key the WebUI
+ * references must exist, and the keys nobody references are counted. See the
+ * referenced-key audit below.
+ *
  * Usage: node tools/webui_check.js
  */
 
@@ -246,6 +250,207 @@ if (!i18nTables) {
   }
 }
 
+/* ---------------------------------------------------- referenced-key audit */
+
+/* Parity above compares the dictionaries with each other, which says nothing
+ * about whether they cover what the application asks for. A key missing from
+ * all three is not a parity failure: it is a key nothing defines, and t() hands
+ * the key itself back, so the interface renders `home.open` where a word
+ * belongs. That is the defect this branch shipped twice - home.open/home.new
+ * were on screen as raw keys from Task 6 until Task 7, and nav.* would have
+ * been from Task 8 on - and neither time did anything fail.
+ *
+ * Every reference is collected from the two places a key can be asked for: the
+ * page's data-i18n* attributes and the string literals the modules pass to
+ * I18N. Each one is then required to resolve.
+ *
+ * i18n.js is read unlike the others: only its own translate() calls count,
+ * never the key-shaped strings - it *defines* the keys, so scanning it the way
+ * the modules are scanned would make every key look referenced and no orphan
+ * would ever be reported. The editor bundle is not scanned at all - it is a
+ * third-party build with no I18N call sites of its own. The ORDER list is what
+ * is scanned rather than every *.js on disk, so a module the page never loads
+ * cannot invent a requirement; ORDER and index.html are compared above, so a
+ * module that *is* loaded is always here too. */
+const PAGE_HTML = path.join(WEBUI, 'index.html');
+
+const DICT_KEYS = new Set();
+const NAMESPACES = new Set();
+for (const lang of Object.keys(i18nTables || {})) {
+  for (const key of Object.keys((i18nTables || {})[lang] || {})) {
+    DICT_KEYS.add(key);
+    const dot = key.indexOf('.');
+    if (dot > 0) { NAMESPACES.add(key.slice(0, dot)); }
+  }
+}
+
+// key -> where it was first seen, for a failure message that points somewhere.
+const referenced = new Map();
+function markReference(key, where) {
+  if (!key || referenced.has(key)) { return; }
+  referenced.set(key, where);
+}
+
+if (fs.existsSync(PAGE_HTML)) {
+  // Comments are stripped for the same reason the ORDER check strips them: a
+  // commented-out attribute is not a reference, and accepting one would let a
+  // key be deleted from the markup and still look used.
+  const html = fs.readFileSync(PAGE_HTML, 'utf8').replace(/<!--[\s\S]*?-->/g, '');
+  const attrPattern =
+    /\bdata-i18n(?:-title|-placeholder|-aria-label)?\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
+  let hit;
+  while ((hit = attrPattern.exec(html)) !== null) {
+    markReference((hit[1] === undefined ? hit[2] : hit[1]).trim(), 'index.html');
+  }
+}
+
+/* The first argument of I18N.t(), and the optional second argument of
+ * I18N.errorText() - the fallback key. Both are matched regardless of what the
+ * key looks like, so a call naming a namespace that does not exist yet is still
+ * reported: this is the rule that catches a key added to the code before it is
+ * added to the dictionaries. */
+const CALL_LITERAL = /\bI18N\.(?:t|errorText)\s*\(\s*(['"])([^'"]*)\1/g;
+const FALLBACK_LITERAL = /\bI18N\.errorText\s*\([^,()]*,\s*(['"])([^'"]*)\1/g;
+
+/* The second rule, narrower, and for a real case rather than a hypothetical one.
+ * FormatBar keeps its fifteen labels in a GROUPS table and applies them through
+ * data-i18n-title after the fact, so `format.bold` never appears as an argument
+ * to I18N.t at all - it is a string property in a table. Looking only at call
+ * arguments would report the entire format bar as orphaned, which is the kind
+ * of false report that gets a check switched off. So a literal is also a
+ * reference when it has the shape `namespace.name` and its namespace is one the
+ * dictionaries already use.
+ *
+ * The namespace test is what keeps unrelated strings of the same shape out:
+ * 'marknest.lang', the localStorage key the language is stored under, and
+ * 'untitled.md', the default name the create prompt offers. Neither is a key,
+ * and an audit that failed on either would be wrong on every run. */
+const SHAPED_LITERAL = /(['"])([a-z][a-z0-9]*(?:\.[A-Za-z][A-Za-z0-9_]*)+)\1/g;
+
+/* The one exception to "i18n.js is not scanned", and it is not an exception of
+ * convenience. errorText's chain of last resorts is written with i18n.js's own
+ * translate() rather than through I18N.t, and its final rung -
+ * translate('err.unknown'), the string that answers an error with no message
+ * at all - is named nowhere else in the application. Skipping the file whole
+ * would report that key as orphaned and would stop requiring it.
+ *
+ * The closing parenthesis is part of the pattern so that the concatenation
+ * `translate('err.code' + code)` is not read as a reference to a key called
+ * `err.code`; that path is the dynamic family, handled below. */
+const TRANSLATE_LITERAL = /\btranslate\s*\(\s*(['"])([^'"]*)\1\s*\)/g;
+
+for (const rel of ORDER) {
+  const file = path.join(WEBUI, rel);
+  if (!fs.existsSync(file)) { continue; }  // the load step above already reports it
+  const patterns = rel === 'js/i18n.js'
+    ? [TRANSLATE_LITERAL]     // definitions, so only its own translate() calls count
+    : [CALL_LITERAL, FALLBACK_LITERAL];
+  fs.readFileSync(file, 'utf8').split('\n').forEach((line, index) => {
+    const trimmed = line.trim();
+    // Comment-only lines, the same approximation the call-site scan uses. A key
+    // quoted in prose should not keep an otherwise dead string alive.
+    if (trimmed.startsWith('*') || trimmed.startsWith('//') || trimmed.startsWith('/*')) {
+      return;
+    }
+    const where = `${rel}:${index + 1}`;
+    for (const pattern of patterns) {
+      pattern.lastIndex = 0;
+      let hit;
+      while ((hit = pattern.exec(line)) !== null) { markReference(hit[2], where); }
+    }
+    if (rel === 'js/i18n.js') { return; }
+    SHAPED_LITERAL.lastIndex = 0;
+    let shaped;
+    while ((shaped = SHAPED_LITERAL.exec(line)) !== null) {
+      const key = shaped[2];
+      if (NAMESPACES.has(key.slice(0, key.indexOf('.')))) { markReference(key, where); }
+    }
+  });
+}
+
+/* I18N.errorText asks for 'err.code' + code, so a backend error code is a key
+ * that never appears as a literal anywhere and cannot be found the way the rest
+ * are. It is resolved instead of skipped: the codes the backend can actually
+ * emit are read out of the backend itself - the error classes that are raised,
+ * plus the codes written straight into a response envelope - and each one must
+ * have a string. An unknown code renders as `err.code3009` in the middle of a
+ * sentence, which is the same failure as a missing string anywhere else.
+ *
+ * "Can emit" is narrower than "declares" on purpose. errors.py also declares
+ * AttachmentRejected and AttachmentNotFound, and no route raises either - the
+ * attachment routes are not dispatched and /options advertises
+ * `attachments: false`. Requiring strings for those two would be adding keys
+ * nothing references, which is the thing the reconciliation rule forbids.
+ *
+ * The limitation is that a code emitted without `raise <Class>(` - a re-raise,
+ * or a class constructed rather than raised - is invisible here. The literal
+ * scan is what covers the envelope-level codes (the platform's 1503 when the
+ * connection limit is reached, and 1000 for anything that reached the generic
+ * handler) and is the place a new one would have to be added. */
+const BACKEND_LIB = path.join(REPO_ROOT, 'usr', 'local', 'marknest', 'lib');
+const dynamicKeys = new Set();
+const refProblems = [];
+
+if (!fs.existsSync(BACKEND_LIB)) {
+  refProblems.push(`${path.relative(REPO_ROOT, BACKEND_LIB)} is missing - ` +
+    'the error-code keys cannot be verified');
+} else {
+  const classCode = new Map();
+  const raised = new Set();
+  const literalCodes = new Map();
+  let errorsSource = '';
+  for (const name of fs.readdirSync(BACKEND_LIB).filter((f) => f.endsWith('.py'))) {
+    const text = fs.readFileSync(path.join(BACKEND_LIB, name), 'utf8');
+    if (name === 'errors.py') { errorsSource = text; }
+    for (const hit of text.matchAll(/\braise\s+([A-Z][A-Za-z0-9_]*)\s*\(/g)) {
+      raised.add(hit[1]);
+    }
+    for (const hit of text.matchAll(/"code":\s*(\d+)/g)) {
+      // 0 is the success envelope - the same literal every good request is
+      // answered with - not an error code, and there is no string for it.
+      if (hit[1] === '0') { continue; }
+      if (!literalCodes.has(hit[1])) { literalCodes.set(hit[1], name); }
+    }
+  }
+  // One chunk per class declaration; the base class carries the 1000 that the
+  // server's generic handler answers with.
+  for (const chunk of errorsSource.split(/\n(?=class\s)/)) {
+    const name = /^class\s+([A-Za-z0-9_]+)\s*\(/.exec(chunk);
+    const code = /^\s{4}code\s*=\s*(\d+)\s*$/m.exec(chunk);
+    if (name && code) { classCode.set(name[1], code[1]); }
+  }
+  const emitted = new Map();
+  for (const [name, code] of classCode) {
+    if (raised.has(name)) { emitted.set(code, `${name} in errors.py`); }
+  }
+  for (const [code, file] of literalCodes) {
+    if (!emitted.has(code)) { emitted.set(code, `a response envelope in ${file}`); }
+  }
+  for (const code of emitted.keys()) {
+    dynamicKeys.add(`err.code${code}`);
+  }
+  for (const [code, origin] of emitted) {
+    const key = `err.code${code}`;
+    if (!DICT_KEYS.has(key)) {
+      refProblems.push(`${key} is emitted by ${origin} but no dictionary defines it`);
+    }
+  }
+}
+
+for (const [key, where] of referenced) {
+  if (!DICT_KEYS.has(key)) {
+    refProblems.push(`${key} is referenced by ${where} but no dictionary defines it`);
+  }
+}
+
+// Information, not a failure. A string whose feature was never built is a
+// decision to make, not a build to break; and a check that fails on one is a
+// check somebody turns off. The count is printed either way so the drift is
+// visible.
+const orphanedKeys = [...DICT_KEYS]
+  .filter((key) => !referenced.has(key) && !dynamicKeys.has(key))
+  .sort();
+
 /* ------------------------------------------------- scan call sites for typos */
 
 const ALLOWED_GLOBALS = new Set([
@@ -299,10 +504,16 @@ for (const rel of loaded) {
  * a list that is guessed rather than read produces false failures such as
  * `API.print`, which never existed (the frontend wrapper is `submitPrint`)
  * and `API.getJobStats`, which never existed (statistics arrive inside the
- * `stats` field of `GET /jobs`). */
+ * `stats` field of `GET /jobs`).
+ *
+ * `UI.statusBadge` is no longer on the list, and it is the one entry that was
+ * taken off rather than put on: it was carried over from the print application
+ * this one was built from, mapped job statuses onto a `jobs.*` key family no
+ * dictionary defines, and nothing called it. The referenced-key audit is what
+ * found it. */
 const REQUIRED = {
   UI: ['el', 'clear', 'show', 'hide', 'toast', 'loading', 'empty', 'errorBox',
-       'hintNode', 'skeleton', 'badge', 'statusBadge', 'formatBytes',
+       'hintNode', 'skeleton', 'badge', 'formatBytes',
        'formatDateTime', 'escapeHtml', 'debounce'],
   I18N: ['t', 'errorText', 'apply', 'setLanguage', 'getLanguage', 'detect',
          'supported'],
@@ -788,6 +999,17 @@ for (const item of i18nProblems) { console.log('  [ERROR] ' + item); }
 if (!i18nProblems.length) { console.log('  ok   every dictionary defines the same keys'); }
 
 console.log('');
+console.log('i18n referenced keys:');
+const checkedSummary = `${referenced.size} referenced key(s) and ${dynamicKeys.size} ` +
+  'backend error code(s) checked';
+for (const item of refProblems) { console.log('  [ERROR] ' + item); }
+console.log(refProblems.length
+  ? `  -    ${checkedSummary}`
+  : `  ok   ${checkedSummary} - every one defined in all three dictionaries`);
+console.log(`  -    ${orphanedKeys.length} defined but referenced nowhere` +
+  (orphanedKeys.length ? ': ' + orphanedKeys.join(', ') : ''));
+
+console.log('');
 console.log('markdown commands:');
 for (const item of cmdProblems) { console.log('  [ERROR] ' + item); }
 if (!cmdProblems.length) { console.log('  ok   every command produces the expected markdown; the ten toggleable ones toggle off'); }
@@ -799,12 +1021,12 @@ if (!vendorProblems.length) { console.log('  ok   built, and exports its declare
 
 const errorCount =
   loadErrors.length + problems.length + missingRequired.length + i18nProblems.length +
-  vendorProblems.length + cmdProblems.length + orderProblems.length;
+  refProblems.length + vendorProblems.length + cmdProblems.length + orderProblems.length;
 console.log('');
 console.log('-'.repeat(62));
 console.log('errors: ' + errorCount);
 console.log(errorCount === 0
-  ? 'RESULT: PASSED - every cross-module reference resolves.'
+  ? 'RESULT: PASSED - every cross-module and i18n reference resolves.'
   : 'RESULT: FAILED');
 
 process.exit(errorCount === 0 ? 0 : 1);
