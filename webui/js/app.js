@@ -452,6 +452,16 @@
       }
     });
 
+    step('filepicker', function () {
+      // The default callback is wired here, not at each call site: the home
+      // screen's button and the menu item both ask for the dialog with no
+      // arguments, so an open() that only remembers a callback it was handed
+      // would import a note and then never show it.
+      if (global.FilePicker) {
+        global.FilePicker.init({ onOpen: openNote });
+      }
+    });
+
     step('preview', function () {
       global.PreviewPane.init();
       var button = document.getElementById('btn-preview-toggle');

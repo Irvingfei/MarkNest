@@ -599,6 +599,104 @@ def main():
                 check("%s calls %s and nothing else" % (name, name),
                       fired == [name], fired)
 
+            print("\n12. opening a file from either source")
+            # Spec §11 items 8 and 9. The picker offers the library and the
+            # machine's own disk; a file from the disk is *imported* rather than
+            # merely opened - the library is the only place a note lives, so
+            # "open" has to mean "bring it in" - and a name the library already
+            # holds is suffixed instead of overwritten.
+            #
+            # Every click below is guarded, for the reason sections 1e and 1f
+            # give: page.click() on an element that does not exist raises a
+            # TimeoutError, and that exception is not a check result - it takes
+            # everything after it down with it. A missing picker should leave a
+            # readable list of failures, not an unhandled exception.
+            page.evaluate("() => { location.hash = '#/home'; }")
+            page.wait_for_timeout(700)
+            has_open = page.evaluate("() => !!document.getElementById('home-open')")
+            if has_open:
+                page.click("#home-open")
+                page.wait_for_timeout(700)
+            picker_open = page.is_visible("#file-picker")
+            check("the picker opens", picker_open)
+            # Read only when it is there: inner_text() raises on a missing node.
+            tabs = page.inner_text("#file-picker") if picker_open else ""
+            check("it offers the library", "笔记库" in tabs, tabs[:160])
+            check("it offers local files", "本机" in tabs, tabs[:160])
+
+            def hand_to_picker(name, content):
+                """Give the picker's file input a File, as a real dialog would.
+
+                A synthetic change event is the only way to reach the import
+                without a native dialog. The input and the handler it fires are
+                the same ones a person's file dialog reaches, and the handler is
+                bound for the document's lifetime rather than only while the
+                dialog is on screen, so the gesture works from either state.
+                """
+                page.evaluate(
+                    """([name, content]) => {
+                         const dt = new DataTransfer();
+                         dt.items.add(new File([content], name, { type: 'text/markdown' }));
+                         const input = document.getElementById('picker-file');
+                         input.files = dt.files;
+                         input.dispatchEvent(new Event('change'));
+                       }""",
+                    [name, content])
+
+            # Spec §7 also puts the type check in the frontend, not only in the
+            # file dialog's accept list: 所有文件 is one click away, and a binary
+            # imported as a note is a garbled note. A .png is the file a person
+            # actually has to hand in this situation - the accept list is
+            # precisely what they overrode to get here.
+            notes_before = len(api.notes)
+            if picker_open:
+                hand_to_picker("picture.png", "\x89PNG not really a png")
+                page.wait_for_timeout(1500)
+            check("a file of a rejected type imported nothing",
+                  picker_open and len(api.notes) == notes_before,
+                  "library went from %d to %d note(s)" % (notes_before, len(api.notes)))
+
+            if picker_open:
+                hand_to_picker("imported-by-test.md", "# Imported\n\nfrom the test\n")
+                page.wait_for_timeout(2500)
+            path_text = page.inner_text("#current-path")
+            check("the imported note opened", "imported-by-test.md" in path_text, path_text)
+            # The library is checked through the same GET the editor uses, not
+            # through the stub's dictionary: an import that wrote to the wrong
+            # place would still fill the dictionary.
+            check("and it is in the library now", page.evaluate(
+                """async () => {
+                     const r = await fetch('/v2/proxy/marknest/notes?path=imported-by-test.md',
+                                           { credentials: 'include', headers: API.authHeaders() });
+                     return r.status === 200;
+                   }"""))
+
+            # The second import carries a name the library already holds. The
+            # stub answers 3006, which is what the retry path keys off; what is
+            # asserted is the outcome - a suffixed note - and that the note that
+            # was already there still holds its own content. The original is read
+            # back rather than searched for a phrase: an earlier section replaced
+            # welcome.md's body, so a phrase check here would assert the wrong
+            # thing and would fail for that reason rather than this one.
+            original_welcome = api.notes.get("welcome.md", "")
+            if picker_open:
+                # Reopened without arguments on purpose: this is the call the
+                # home screen's button and the menu item make, and the import
+                # has to open what it imported with no callback passed in.
+                page.evaluate("() => { window.FilePicker.open(); }")
+                page.wait_for_timeout(300)
+                hand_to_picker("welcome.md", "# Second\n")
+                page.wait_for_timeout(2500)
+            collision_text = page.inner_text("#current-path")
+            check("the collision produced a suffixed note",
+                  "welcome-1.md" in collision_text, collision_text)
+            check("the original note was not overwritten",
+                  api.notes.get("welcome.md", "") == original_welcome,
+                  api.notes.get("welcome.md", "")[:60].replace("\n", " "))
+            check("and the colliding file became a note of its own",
+                  api.notes.get("welcome-1.md") == "# Second\n",
+                  api.notes.get("welcome-1.md"))
+
             browser.close()
     finally:
         httpd.shutdown()

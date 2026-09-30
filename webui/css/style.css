@@ -743,6 +743,140 @@ html, body {
 .ctx-item.is-danger { color: var(--danger); }
 .ctx-item.is-danger:hover { background: var(--danger-soft); }
 
+/* ------------------------------------------------------------------- modal */
+
+/* The open-file dialog. Its rules are written rather than reused: the plan
+   pointed at a `.modal` set that "already exists", and this stylesheet has no
+   `.modal`, `.modal-veil`, `.modal-dialog`, `.modal-head`, `.modal-close`,
+   `.modal-toolbar`, `.modal-body` or `.modal-foot` anywhere - the same
+   assumption `.nas-*` turned out to be. Every custom property used below is
+   already in :root, so the dark-mode block themes the dialog too. The four
+   sides are written out instead of `inset`, and the panel's width as a width
+   plus a max-width instead of `min()`, because the host's WebView version is
+   not known and neither shorthand is used anywhere else in this file. */
+
+.modal {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  /* Above the menu panels (60); the toast host is lifted above this below,
+     because the dialog's own feedback is a toast. */
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* The host paints a drag band over the top of the frame and a resize strip
+     over the bottom; the padding keeps the panel out of both, the way the
+     topbar's own padding clears the band. */
+  padding: calc(var(--host-band-top) + 12px) 16px calc(var(--host-band-bottom) + 12px);
+}
+
+/* The display:flex above beats the user agent's [hidden] { display: none }, so
+   the attribute needs help - the same rule, and the same reason, the menu
+   panel and the format bar each carry. */
+.modal[hidden] { display: none; }
+
+/* A sibling of the panel rather than the container's own background: one press
+   can then be told apart from the other. A press on the veil is a press on the
+   backdrop and closes; a press on the panel reaches the panel. Painting the dim
+   on `.modal` would make every press look like one on the backdrop. */
+.modal-veil {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background: rgba(12, 18, 30, .45);
+}
+
+.modal-dialog {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  width: 620px;
+  max-width: 100%;
+  /* Bounded so a large library scrolls inside the panel instead of running past
+     the frame. 100% is the container's content box, which the padding above has
+     already shrunk to what the host bands leave. */
+  max-height: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-head h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.modal-close {
+  font: inherit;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  border-radius: 5px;
+  padding: 2px 7px;
+  cursor: pointer;
+}
+.modal-close:hover { color: var(--text); background: var(--surface-2); }
+.modal-close:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+
+/* The tab strip. The buttons are the shared .btn/.btn-sm, so the two sources
+   look like every other control in the frame; only the row is new. */
+.modal-toolbar {
+  display: flex;
+  gap: 6px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-body {
+  flex: 1 1 auto;
+  /* Without this a flex child refuses to shrink below its content, the panel
+     reaches its maximum height and the body never scrolls - it just overflows
+     the rounded corner instead. */
+  min-height: 0;
+  overflow: auto;
+}
+
+/* The foot holds one control and only on the local tab: the file input is
+   [hidden] and so is the browse button until that tab is chosen. An empty foot
+   therefore has to paint nothing, and the spacing lives on the button rather
+   than on the foot so that a hidden button leaves an element with no box, no
+   border and no background - instead of a strip of chrome under the body that
+   reads as a broken layout. Keying the foot's padding off the button being
+   visible would need :has(), which the host's WebView is not guaranteed to
+   support. */
+.modal-foot {
+  display: flex;
+  justify-content: flex-end;
+}
+.modal-foot .btn { margin: 12px 14px; }
+
+/* The dialog reports a refused file type and a failed read through a toast, and
+   the dark toast surface behind the veil's 45% wash would be unreadable - which
+   would turn the only feedback for a refused file into no feedback at all.
+   Base < menu < dialog < toast is the layering that needs; the host is lifted
+   rather than the dialog lowered, which would put the dialog under the menu. */
+.toast-host { z-index: 80; }
+
 /* ------------------------------------------------------------- narrow widths */
 
 /* Collapse progressively rather than squeezing three panes into a frame that

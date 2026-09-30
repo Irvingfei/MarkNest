@@ -2154,18 +2154,15 @@ node tools/webui_check.js
 
 | 键 | zh-cn | zh-hk | en-us |
 |---|---|---|---|
-| `picker.title` | 打开文件 | 開啟檔案 | Open a file |
-| `picker.library` | 笔记库 | 筆記庫 | Library |
-| `picker.local` | 本机文件 | 本機檔案 | This computer |
-| `picker.browse` | 选择本机文件… | 選擇本機檔案… | Choose a file… |
-| `picker.localHint` | 选择本机文件后将导入到笔记库，成为一篇普通笔记。 | 選擇本機檔案後將匯入筆記庫，成為一篇普通筆記。 | A file chosen here is imported into your library, where it becomes an ordinary note. |
-| `picker.readFailed` | 无法读取该文件 | 無法讀取該檔案 | That file could not be read |
+| *（表已清空——四组文案都随各自的任务先行落地，逐条见下）* | | | |
 
 > **`format.*` 一组已在 Task 5 加入，本任务不再重复。** 那不是提前偷跑：格式栏的 tooltip 断言要能通过，`I18N.t('format.bold')` 就不能返回键名，所以 Task 5 只能先把那组文案写进三个字典。写进去的是工具栏的 15 条，外加 `format.linkTextPrompt`（无选中时链接按钮先问显示文字），共 16 条，位置在 `webui/js/i18n.js` 每个字典的 `editor.*` 与 `preview.*` 之间。上面这张表因此不再列它——要改那组文案，直接改文件；照着一张重复的表再添一遍，是下一个人对着已有键发愣的来源。
 >
 > **`home.*` 一组已在 Task 7 加入，本任务同样不再重复。** 原因比 `format.*` 更早、也更隐蔽：`webui/index.html` 从 Task 6 起因主页容器带着 `data-i18n="home.open"` 和 `data-i18n="home.new"`，而 `webui_check.js` 只比较三个字典**彼此**是否齐平、从不检查代码引用了什么，所以那两个按钮从 Task 6 起一直在屏幕上显示**键名本身**（`home.open` / `home.new`），没有任何断言失败。Task 7 的 `HomePane` 又需要另外 7 条，于是整组 9 条随它一起写进三个字典，位置在每个字典的 `common.*` 与 `tree.*` 之间。上面这张表因此也不再列 `home.*`——照表再添一遍会与已有键撞名，而撞名不会报错，只会把键悄悄重复一遍。
 >
 > **`nav.*` 一组已在 Task 8 加入，本任务同样不再重复。** 它是 `home.*` 那类缺失的第二次发作，而且这一次有断言兜住：Task 8 的 `webui/index.html` 一落地，☰ 按钮就带着 `data-i18n-title="nav.more"`、三个菜单项各带着 `data-i18n="nav.*"`，没有文案时菜单里就是 `nav.home` / `nav.newNote` / `nav.openNote` 三行键名，tooltip 也是 `nav.more`——`webui_check.js` 只比较三个字典**彼此**齐平，仍然不会报错。Task 8 的 `the menu offers 主页` 是第一次让这件事失败的地方，所以这 4 条只能随菜单一起进三个字典，位置在每个字典的 `home.*` 与 `tree.*` 之间。上面这张表因此也不再列 `nav.*`。
+>
+> **`picker.*` 一组已在 Task 9 加入，本任务同样不再重复。** 这是 `home.*` 那类缺失的第三次发作，同一个机制：弹层标记在 `webui/index.html` 里带着 `data-i18n="picker.title"` / `picker.library` / `picker.local` / `picker.browse`，`FilePicker` 又用 `I18N.t()` 直接取 `picker.localHint` 与 `picker.readFailed`，没有文案时这些位置全是键名，而 `webui_check.js` 只比较三个字典彼此齐平，照旧不会报错。所以 Task 9 只能让这 7 条随弹层一起进三个字典，位置在每个字典的 `tree.*` 之后、`editor.*` 之前（弹层里渲染的就是那棵树）。多出来的第 7 条是 `picker.badType`：设计 §7 要求文件类型在前端检查，被拒的文件得有话说。上面这张表因此也不再列 `picker.*`——按表再添一遍是与已有键撞名，而撞名的重复键不会报错，只会安静地多一份。
 
 - [ ] **Step 4: 运行，确认通过**
 

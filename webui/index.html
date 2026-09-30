@@ -126,6 +126,34 @@
             data-i18n="nav.openNote">打开文件</button>
   </div>
 
+  <!-- The open-file dialog. It is a child of the application shell rather than
+       of the home screen, because the menu opens it from the note view too; it
+       is position:fixed, so where it sits in the tree does not affect where it
+       paints. The veil is its own element so that a press on the backdrop can
+       be told apart from a press on the panel. -->
+  <div class="modal" id="file-picker" hidden>
+    <div class="modal-veil" data-picker-close="1"></div>
+    <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="file-picker-title">
+      <div class="modal-head">
+        <h2 id="file-picker-title" data-i18n="picker.title">打开文件</h2>
+        <button class="modal-close" type="button" id="picker-close"
+                data-i18n-aria-label="common.close" aria-label="关闭">×</button>
+      </div>
+      <div class="modal-toolbar">
+        <button type="button" class="btn btn-sm is-active" id="picker-tab-library"
+                data-i18n="picker.library">笔记库</button>
+        <button type="button" class="btn btn-sm" id="picker-tab-local"
+                data-i18n="picker.local">本机文件</button>
+      </div>
+      <div class="modal-body" id="picker-body"></div>
+      <div class="modal-foot">
+        <input type="file" id="picker-file" accept=".md,.markdown,.mdown,.txt" hidden>
+        <button type="button" class="btn" id="picker-browse" hidden
+                data-i18n="picker.browse">选择本机文件…</button>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <div class="toast-host" id="toast-host" aria-live="polite"></div>
@@ -138,6 +166,7 @@
 <script src="js/vendor.editor.js?v=1.0.2"></script>
 <script src="js/formatbar.js?v=1.0.2"></script>
 <script src="js/homepane.js?v=1.0.2"></script>
+<script src="js/filepicker.js?v=1.0.2"></script>
 <script src="js/treepane.js?v=1.0.2"></script>
 <script src="js/editorpane.js?v=1.0.2"></script>
 <script src="js/previewpane.js?v=1.0.2"></script>

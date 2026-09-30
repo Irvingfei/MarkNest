@@ -61,6 +61,14 @@
       'tree.renamed': '已重命名',
       'tree.deleted': '已删除 {name}',
 
+      'picker.title': '打开文件',
+      'picker.library': '笔记库',
+      'picker.local': '本机文件',
+      'picker.browse': '选择本机文件…',
+      'picker.localHint': '选择本机文件后将导入到笔记库，成为一篇普通笔记。',
+      'picker.readFailed': '无法读取该文件',
+      'picker.badType': '只能选择文本笔记（.md / .markdown / .mdown / .txt）',
+
       'editor.title': '编辑',
       'editor.ariaLabel': 'Markdown 编辑器',
       'editor.save': '保存',
@@ -182,6 +190,14 @@
       'tree.renamed': '已重新命名',
       'tree.deleted': '已刪除 {name}',
 
+      'picker.title': '開啟檔案',
+      'picker.library': '筆記庫',
+      'picker.local': '本機檔案',
+      'picker.browse': '選擇本機檔案…',
+      'picker.localHint': '選擇本機檔案後將匯入筆記庫，成為一篇普通筆記。',
+      'picker.readFailed': '無法讀取該檔案',
+      'picker.badType': '只能選擇文字筆記（.md / .markdown / .mdown / .txt）',
+
       'editor.title': '編輯',
       'editor.ariaLabel': 'Markdown 編輯器',
       'editor.save': '儲存',
@@ -302,6 +318,14 @@
       'tree.created': 'Created {name}',
       'tree.renamed': 'Renamed',
       'tree.deleted': 'Deleted {name}',
+
+      'picker.title': 'Open a file',
+      'picker.library': 'Library',
+      'picker.local': 'This computer',
+      'picker.browse': 'Choose a file…',
+      'picker.localHint': 'A file chosen here is imported into your library, where it becomes an ordinary note.',
+      'picker.readFailed': 'That file could not be read',
+      'picker.badType': 'Only text notes can be opened (.md, .markdown, .mdown, .txt)',
 
       'editor.title': 'Editor',
       'editor.ariaLabel': 'Markdown editor',
