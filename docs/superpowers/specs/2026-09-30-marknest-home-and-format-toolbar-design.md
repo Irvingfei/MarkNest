@@ -166,7 +166,7 @@ TOS 桌面把窗口家具**画在 iframe 之上**，顶栏最上面 **46px 整�
 
 ```
 GET /recent?limit=N
-  → { "notes": [ {path, title, mtime_ns, size}, ... ], "count": N }
+  → { "recent": [ {path, title, mtime_ns, size}, ... ], "count": N, "limit": M }
 ```
 
 - 按 `mtime_ns` 倒序，限当前用户

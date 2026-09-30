@@ -153,6 +153,16 @@ def main():
             print("\n1e. the home screen lists recent notes")
             check("both home actions are offered", page.evaluate(
                 "() => !!document.getElementById('home-open') && !!document.getElementById('home-new')"))
+            # Translated, not the key name. The two buttons rendered "home.open"
+            # and "home.new" on screen from Task 6 until these strings landed,
+            # and nothing failed: webui_check.js compares the three dictionaries
+            # against each other and never against what the code references, so
+            # a key missing from all three passes it. This is the only place
+            # that would notice the strings going away again.
+            check("the home buttons are translated, not raw keys", page.evaluate(
+                "() => { var b = document.getElementById('home-open');"
+                " return !!b && b.textContent.indexOf('home.') !== 0; }"),
+                page.evaluate("() => (document.getElementById('home-open')||{}).textContent"))
             page.wait_for_timeout(800)
             recent = page.inner_text("#home-recent")
             check("the recent list names a note", "welcome.md" in recent, recent[:160])
@@ -170,13 +180,24 @@ def main():
             check("more than one note is listed, so the order means something",
                   len(order) > 1, order)
 
-            page.click("#home-recent .home-recent-item")
-            page.wait_for_timeout(900)
+            # The click is guarded rather than fired blindly. With no row to
+            # click - which is the state of the pre-task tree, and of any build
+            # whose home screen is broken - page.click() raises a TimeoutError,
+            # and that exception takes sections 2 to 11 down with it. A broken
+            # home screen should leave a readable failure list, not an unhandled
+            # exception that hides every section after this one.
+            items = page.evaluate(
+                "() => document.querySelectorAll('#home-recent .home-recent-item').length")
+            if items:
+                page.click("#home-recent .home-recent-item")
+                page.wait_for_timeout(900)
             check("clicking a recent note opens it",
-                  "welcome.md" in page.inner_text("#current-path"),
-                  page.inner_text("#current-path"))
-            check("and the application leaves the home screen", page.evaluate(
-                "() => !document.getElementById('workspace').classList.contains('is-home')"))
+                  bool(items) and "welcome.md" in page.inner_text("#current-path"),
+                  page.inner_text("#current-path") if items else "no recent item to click")
+            check("and the application leaves the home screen",
+                  bool(items) and page.evaluate(
+                      "() => !document.getElementById('workspace').classList.contains('is-home')"),
+                  "" if items else "no recent item to click")
 
             print("\n2. opening a note")
             # Section 2 is about the click path, so the note that is already

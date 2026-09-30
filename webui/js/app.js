@@ -266,6 +266,13 @@
         if (global.TreePane) {
           global.TreePane.render();
         }
+        // The home pane is re-loaded rather than re-rendered: its rows carry no
+        // data-i18n attribute, because the relative time is produced by
+        // relativeTime() when the row is built, so apply() cannot reach it and
+        // only running the rows again produces the new language in them.
+        if (global.HomePane) {
+          global.HomePane.reload();
+        }
         if (global.EditorPane && global.EditorPane.editor()) {
           global.PreviewPane.render(global.EditorPane.editor().getValue());
         }

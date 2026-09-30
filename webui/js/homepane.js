@@ -14,7 +14,6 @@
   var hosts = {};
 
   function cacheHosts() {
-    hosts.root = document.getElementById('home');
     hosts.recent = document.getElementById('home-recent');
     hosts.open = document.getElementById('home-open');
     hosts.create = document.getElementById('home-new');
