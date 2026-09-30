@@ -145,44 +145,34 @@
     return index === 0 && empty;
   }
 
-  /* Where the two endpoints land after the edit.
+  /* Where the endpoints land after the edit.
    *
-   * A single block-wide delta is wrong for anything past the first line: adding
-   * a marker to two lines grows the block by two prefixes, and shifting both
-   * endpoints by that total moves the start forward by the growth of lines that
-   * begin *before* it, so the selection collapses onto the tail of the block
-   * instead of covering it. Each endpoint is therefore shifted by the growth of
-   * the lines that start strictly before it.
+   * A line-start command rewrites the whole block, and every line in it moves
+   * by its own prefix, so a sub-line offset cannot be carried across the edit:
+   * the growth of the line an endpoint happens to sit in is not the growth that
+   * applies to that endpoint, and summing the growths of the lines that start
+   * before it under-shoots as soon as it lands inside the span its own line
+   * removed. Rather than walk the growths and approximate, the selection is the
+   * whole transformed block - the block is what the command rewrote, so it is
+   * what the person is now working on. That also makes the toggle hold by
+   * construction: the second press always sees exactly what the first one
+   * wrote, whichever part of the block was selected.
    *
-   * A caret is the exception. `from === to` is a point, and a point at the
-   * start of a line would be shifted by nothing and left sitting in front of
-   * the marker it just caused; the uniform delta is exactly the growth of the
-   * one line a caret can be on, which is what puts the cursor after an inserted
-   * prefix rather than before it. */
+   * A caret is the one case that keeps a real offset, and can: `from === to` is
+   * always a one-line block, so the uniform delta is exactly that line's growth,
+   * and it is what puts the cursor after an inserted prefix rather than in front
+   * of it. */
   function blockResult(range, ctx, text) {
-    var lines = text.split('\n');
-    var growth = [];
-    var at = 0;
-    for (var i = 0; i < range.lines.length; i += 1) {
-      growth.push({ at: range.start + at, by: lines[i].length - range.lines[i].length });
-      at += range.lines[i].length + 1;
+    if (ctx.from === ctx.to) {
+      var caret = Math.max(range.start, ctx.from + text.length - (range.end - range.start));
+      return {
+        changes: { from: range.start, to: range.end, insert: text },
+        selection: { anchor: caret, head: caret }
+      };
     }
-    var uniform = text.length - (range.end - range.start);
-    var shift = function (endpoint) {
-      if (ctx.from === ctx.to) {
-        return Math.max(range.start, endpoint + uniform);
-      }
-      var delta = 0;
-      for (var j = 0; j < growth.length; j += 1) {
-        if (growth[j].at < endpoint) {
-          delta += growth[j].by;
-        }
-      }
-      return Math.max(range.start, endpoint + delta);
-    };
     return {
       changes: { from: range.start, to: range.end, insert: text },
-      selection: { anchor: shift(ctx.from), head: shift(ctx.to) }
+      selection: { anchor: range.start, head: range.start + text.length }
     };
   }
 
@@ -242,6 +232,11 @@
 
   /* --------------------------------------------------------------- list */
 
+  /* The task insertion form is only ever `- [ ] `, so a checked item does not
+     round-trip through this command: '- [x] a' becomes 'a', and pressing again
+     gives '- [ ] a'. That is a deliberate consequence of the design, whose task
+     row offers no checked insertion form - not something to fix by making the
+     command remember the state it removed. */
   function task(ctx) {
     return lineCommand(ctx, ['- [ ] ', '- [x] '], function (t) { return '- [ ] ' + t; });
   }

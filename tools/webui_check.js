@@ -474,6 +474,41 @@ if (!CMD) {
       cmdProblems.push(`multi-line toggle-off: ${name} produced ${JSON.stringify(twice.changes.insert)} on the second press`);
     }
   }
+  // The loop above only ever selects a whole block, so its second press starts
+  // from a selection that already covers everything the first press wrote. A
+  // person often selects part of a marked block instead, and that is where the
+  // endpoint arithmetic was at its most fragile: an endpoint landing inside the
+  // span its own line had just removed was counted that line's whole growth,
+  // leaving the selection short, collapsed onto a caret, or - for `numbered`
+  // over two ordered items - inverted. Pressing twice has to give the document
+  // back whatever was selected the first time.
+  const partials = [
+    ['quote', '> a\n> b', 0, 5],
+    ['quote', '> a\n> b', 1, 4],
+    ['task', '- [ ] a\n- [ ] b', 0, 10],
+    ['bullet', '- a\n- b', 1, 4],
+    ['numbered', '1. a\n1. b', 4, 6]
+  ];
+  for (const [name, doc, from, to] of partials) {
+    const fn = CMD.commands && CMD.commands[name];
+    if (typeof fn !== 'function') { continue; }
+    const once = fn({ doc: doc, from: from, to: to, selected: doc.slice(from, to) });
+    const applied = once.changes.insert;
+    if (once.selection.anchor > once.selection.head) {
+      cmdProblems.push(
+        `partial-selection toggle: ${name} returned an inverted selection ${JSON.stringify(once.selection)}`);
+      continue;
+    }
+    const twice = fn({ doc: applied, from: once.selection.anchor, to: once.selection.head,
+                       selected: applied.slice(once.selection.anchor, once.selection.head) });
+    const restored = applied.slice(0, twice.changes.from) + twice.changes.insert +
+      applied.slice(twice.changes.to);
+    if (restored !== doc) {
+      cmdProblems.push(
+        `partial-selection toggle: ${name} on ${JSON.stringify(doc)} ${from}..${to} became ` +
+        `${JSON.stringify(restored)}`);
+    }
+  }
   // The all-blank block, in both directions. Neither toggle loop above can
   // reach it: both start from a document with text in it. Pressing quote on an
   // empty note has to put the marker where the cursor is, and pressing it again
