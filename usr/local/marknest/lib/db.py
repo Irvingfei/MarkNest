@@ -237,6 +237,35 @@ class IndexStore:
         except sqlite3.Error:
             return None
 
+    def recent(self, user, limit=12):
+        """The user's notes, most recently modified first.
+
+        There is no "recently opened" bookkeeping and deliberately so: this is
+        the same table the search index maintains, ordered by the file's own
+        modification time. That means an edit made over SMB shows up here
+        immediately after the next scan, which is what a person means by
+        "recent" anyway - and it costs no state to keep in step.
+        """
+        conn = self._connect()
+        try:
+            rows = conn.execute(
+                "SELECT rel_path, title, mtime_ns, size_bytes FROM notes "
+                "WHERE user = ? ORDER BY mtime_ns DESC, rel_path LIMIT ?",
+                (user, int(limit)),
+            ).fetchall()
+        except sqlite3.Error as exc:
+            log.warning("cannot list recent notes for %s: %s", user, exc)
+            raise IndexUnavailable("the search index could not be read")
+        return [
+            {
+                "path": row["rel_path"],
+                "title": row["title"] or row["rel_path"],
+                "mtime_ns": int(row["mtime_ns"]),
+                "size": int(row["size_bytes"]),
+            }
+            for row in rows
+        ]
+
     # -------------------------------------------------------------------- search
 
     def search(self, user, query, limit=50):

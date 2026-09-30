@@ -16,6 +16,7 @@ import os
 import shutil
 import sys
 import tempfile
+import time
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 APP_ROOT = os.path.join(REPO_ROOT, "usr", "local", "marknest")
@@ -340,6 +341,27 @@ def test_index_freshness():
     os.unlink(staging)
 
 
+def test_recent():
+    print("\n8b. Recent notes come from the index, newest first, own user only")
+    library.create_note(USER, "r/old.md", "# Old\n")
+    index.scan(USER, force=True)
+    # mtime granularity can be coarse; nudge the clock so the order is real.
+    time.sleep(0.02)
+    library.create_note(USER, "r/new.md", "# New\n")
+    index.scan(USER, force=True)
+    library.create_note(OTHER, "r/other.md", "# Other\n")
+    index.scan(OTHER, force=True)
+
+    rows = db.store.recent(USER, 10)
+    paths = [row["path"] for row in rows]
+    check("the newest note comes first", paths and paths[0] == "r/new.md", paths)
+    check("an older note follows", "r/old.md" in paths, paths)
+    check("another user's note never appears", "r/other.md" not in paths, paths)
+    check("rows carry what the home screen shows",
+          all(set(("path", "title", "mtime_ns", "size")) <= set(row) for row in rows), rows[:1])
+    check("the limit is honoured", len(db.store.recent(USER, 1)) == 1)
+
+
 def test_identity_validation():
     print("\n8. Identity: the cookie is treated as untrusted input")
     from lib import auth
@@ -413,6 +435,7 @@ def main():
         test_conflicts()
         test_search()
         test_index_freshness()
+        test_recent()
         test_identity_validation()
         test_limits()
     finally:
