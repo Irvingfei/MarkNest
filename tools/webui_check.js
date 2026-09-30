@@ -342,13 +342,21 @@ for (const [moduleName, members] of Object.entries(REQUIRED)) {
  * The editor bundle is dropped from the page's list for the same reason it is
  * absent from ORDER (see the note above): it is a third-party build this
  * sandbox cannot execute. Every other tag must match by position, and the
- * first divergence is reported by index and by name. */
+ * first divergence is reported by index and by name.
+ *
+ * Comments are stripped before scanning. A commented-out tag is still a tag to
+ * a regex, so `<!-- <script src="js/mdcmd.js"></script> -->` would satisfy a
+ * check whose whole purpose is to notice a script that does not load - the
+ * one silent way this can be wrong. A single-quoted attribute is the other,
+ * and it is left alone deliberately: it fails loudly at position 0, which is
+ * the safe direction. */
 const orderProblems = [];
 const INDEX_HTML = path.join(WEBUI, 'index.html');
 if (!fs.existsSync(INDEX_HTML)) {
   orderProblems.push('webui/index.html is missing - the script order cannot be verified');
 } else {
-  const html = fs.readFileSync(INDEX_HTML, 'utf8');
+  const raw = fs.readFileSync(INDEX_HTML, 'utf8');
+  const html = raw.replace(/<!--[\s\S]*?-->/g, '');
   const fromPage = [];
   const tagPattern = /<script\b[^>]*\bsrc="([^"]+)"/g;
   let tag;
@@ -765,6 +773,11 @@ console.log('required API surface:');
 for (const item of missingRequired) { console.log('  [ERROR] ' + item); }
 
 console.log('');
+console.log('script order (ORDER vs index.html):');
+for (const item of orderProblems) { console.log('  [ERROR] ' + item); }
+if (!orderProblems.length) { console.log('  ok   index.html loads the same scripts, in the same order, as ORDER'); }
+
+console.log('');
 console.log('i18n key parity:');
 for (const item of i18nProblems) { console.log('  [ERROR] ' + item); }
 if (!i18nProblems.length) { console.log('  ok   every dictionary defines the same keys'); }
@@ -773,11 +786,6 @@ console.log('');
 console.log('markdown commands:');
 for (const item of cmdProblems) { console.log('  [ERROR] ' + item); }
 if (!cmdProblems.length) { console.log('  ok   every command produces the expected markdown; the ten toggleable ones toggle off'); }
-
-console.log('');
-console.log('script order (ORDER vs index.html):');
-for (const item of orderProblems) { console.log('  [ERROR] ' + item); }
-if (!orderProblems.length) { console.log('  ok   index.html loads the same scripts, in the same order, as ORDER'); }
 
 console.log('');
 console.log('editor bundle:');

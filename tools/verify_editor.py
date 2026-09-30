@@ -105,6 +105,11 @@ def main():
             check("the tree listed the notes", "welcome.md" in page.inner_text("#tree-body"),
                   page.inner_text("#tree-body")[:120])
             check("no uncaught error during boot", not console_errors, console_errors[:2])
+            # The other half of "only in the note view": the bar appears with a
+            # note, and it must therefore not be there without one. Asserted
+            # before section 2 opens anything.
+            check("the format bar is hidden until a note is open",
+                  not app_note_visible(page, "#format-bar"))
 
             print("\n2. opening a note")
             click_note(page, "welcome.md")
@@ -277,6 +282,56 @@ def main():
             page.wait_for_timeout(500)
             check("the tree collapses on a narrower one", page.evaluate(
                 "() => document.getElementById('workspace').classList.contains('is-no-tree')"))
+
+            print("\n11. every format button calls its own command")
+            # Last, because thirteen commands rewrite the document and nothing
+            # after this needs it intact. The viewport goes back to its normal
+            # size so the whole bar is on screen and none of the buttons has to
+            # be scrolled to inside an overflow container to be clicked.
+
+            # A dialog handler has to be installed before the link button is
+            # pressed: Playwright dismisses an unhandled dialog automatically,
+            # prompt() then returns null, and the link command - which asks
+            # twice when there is no selection - would never fire, failing the
+            # check for a reason that has nothing to do with the wiring.
+            page.on("dialog", lambda dialog: dialog.accept("https://example.com"))
+
+            page.set_viewport_size({"width": 1280, "height": 800})
+            page.wait_for_timeout(300)
+
+            # Each command is wrapped rather than replaced, so a correctly
+            # wired button still edits the document. The wrapper records the
+            # name it was reached by, which is the thing under test.
+            #
+            # The originals are copied into `real` before anything is
+            # overwritten. Holding a second reference to the live object is not
+            # enough: `live[name] = wrapper` would make `real[name]` the wrapper
+            # too, and every press would recurse until the stack ran out.
+            page.evaluate("""() => {
+                window.__fired = [];
+                const live = window.MDCmd.commands;
+                const real = {};
+                Object.keys(live).forEach(function (name) { real[name] = live[name]; });
+                Object.keys(real).forEach(function (name) {
+                  live[name] = function () {
+                    window.__fired.push(name);
+                    return real[name].apply(null, arguments);
+                  };
+                });
+              }""")
+
+            # Iterating the expected names and requiring exactly that one
+            # covers both a transposed command and a row whose `id` and
+            # `command` disagree - GROUPS repeats the same value in all
+            # thirteen rows and nothing else checks they stay equal.
+            for name in ("bold", "italic", "code", "codeblock", "quote", "h1", "h2",
+                         "h3", "task", "bullet", "numbered", "link", "table"):
+                page.evaluate("() => { window.__fired = []; }")
+                page.click("#fmt-" + name)
+                page.wait_for_timeout(150)
+                fired = page.evaluate("() => window.__fired")
+                check("%s calls %s and nothing else" % (name, name),
+                      fired == [name], fired)
 
             browser.close()
     finally:
