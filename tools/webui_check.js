@@ -402,6 +402,14 @@ if (!CMD) {
     // inline text and the closing one opens a block that swallows the note.
     ['a code block starts on its own line', 'codeblock',
       { doc: 'abc', from: 3, to: 3, selected: '' }, '\n```\n\n```'],
+    // A table has to end its own line for the same reason a fence does: the
+    // text after the caret would otherwise glue onto the last row. The caret is
+    // mid-word on purpose - at the end of the document the tail is empty and
+    // the insertion is byte-identical with or without it, so an assertion there
+    // would pin the lead and never the tail. The whole insertion is compared.
+    ['a table starts and ends on its own line', 'table',
+      { doc: 'abc', from: 1, to: 1, selected: '' },
+      '\n|  |  |  |\n| --- | --- | --- |\n|  |  |  |\n'],
     // The checked marker is a distinct prefix: without it a checked item is not
     // recognised as a task at all, and comes back as '- [ ] - [x] done'.
     ['a task item removes a checked marker', 'task',
