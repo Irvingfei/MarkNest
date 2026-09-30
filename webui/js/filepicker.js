@@ -63,7 +63,13 @@
       // as unstyled markup.
       var list = UI.el('div', { class: 'tree-list' });
       entries.forEach(function (entry) {
-        if (entry.type === 'other') {
+        // The same question the tree asks, asked the same way: the backend's
+        // `note` boolean, not a `type` value. `type` is derived from it, so a
+        // literal test here would be a second place to keep in step with
+        // library.py - which is the drift that made the tree refuse every note.
+        // A folder is neither: it is kept, and descended into on click, even
+        // though `note` is false for it too.
+        if (entry.type !== 'dir' && !entry.note) {
           return;
         }
         var row = UI.el('button', { type: 'button',

@@ -103,7 +103,13 @@ class StubApi:
                 entries.append({
                     "name": rest,
                     "path": full,
-                    "type": "note" if is_note else "other",
+                    # library.py's shape, exactly: `type` is "dir" for a folder
+                    # and "file" for a file, rewritten to "other" when the file
+                    # is not one this application will open. "Is this a note?" is
+                    # the separate `note` boolean. There is no "note" type - the
+                    # stub used to send one, which let the tree's guard ask for a
+                    # value no backend has ever emitted and stay green.
+                    "type": "file" if is_note else "other",
                     "note": is_note,
                     "size": len(self.notes[full].encode("utf-8")),
                     "mtime_ns": 0,

@@ -283,8 +283,45 @@ def main():
             # screen, since the tree row is not clickable while the home screen
             # is covering it.
             open_note_directly(page, "welcome.md")
+
+            # The tree row is the only way a person opens a note by name, and it
+            # was refusing every one of them. treepane's click guard asked for a
+            # `type` of 'note'; library.py has never sent that value - it sends
+            # 'file' for a note and 'other' for a file it will not open, and
+            # answers "is this a note?" with the separate `note` boolean. The stub
+            # sent the shape the frontend wanted, so the two agreed with each
+            # other and with neither the backend nor a device, and no other
+            # section noticed because every one of them opens its note by address.
+            #
+            # Both ends are read, so the pair cannot drift apart quietly: the
+            # entry is the stub's own answer, fetched through the same endpoint
+            # and credentials the tree uses, and the second check is the tree
+            # acting on it. If the stub stops answering the way library.py does,
+            # the first check fails; if the tree stops honouring that answer, the
+            # second one does - which is exactly what it did here.
+            entry = page.evaluate("""async () => {
+                const r = await fetch('/v2/proxy/marknest/tree',
+                                      { credentials: 'include', headers: API.authHeaders() });
+                const body = await r.json();
+                return ((body.data || {}).entries || []).filter(
+                    (e) => e.name === 'welcome.md')[0] || null;
+            }""")
+            check("the stub serves a note the way library.py does (type 'file', note true)",
+                  bool(entry) and entry.get("type") == "file" and entry.get("note") is True,
+                  entry)
+
+            # Counted through the request the click causes, not through what the
+            # editor holds: the shortcut above already put welcome.md there, so
+            # reading the editor back would pass even if the click did nothing -
+            # the mistake section 8's comment records.
+            before = len(state["requests"])
             click_note(page, "welcome.md")
             page.wait_for_timeout(700)
+            reopened = [r for r in state["requests"][before:]
+                        if r[1].endswith("/notes")
+                        and (r[2].get("path") or [""])[0] == "welcome.md"]
+            check("clicking a note in the tree opens it", len(reopened) == 1,
+                  "the click sent %d read(s) of welcome.md" % len(reopened))
             check("the editor holds the note", page.evaluate(
                 "() => { var cm = document.querySelector('.cm-content');"
                 " return !!cm && cm.textContent.indexOf('Welcome to MarkNest') !== -1; }"))
@@ -623,6 +660,19 @@ def main():
             tabs = page.inner_text("#file-picker") if picker_open else ""
             check("it offers the library", "笔记库" in tabs, tabs[:160])
             check("it offers local files", "本机" in tabs, tabs[:160])
+
+            # The library tab filters the same entries the tree does, and it
+            # now asks the same question of them - the backend's `note` boolean
+            # rather than a `type` literal. A folder is false for that boolean
+            # too, so a filter that dropped everything non-note would empty the
+            # list of the folders a person needs to reach a nested note, and
+            # nothing else here would notice: no other section clicks a folder
+            # inside the picker.
+            rows = page.evaluate("""() => Array.from(
+                document.querySelectorAll('#picker-body .tree-name'))
+                .map((node) => node.textContent)""") if picker_open else []
+            check("the library tab lists the folder as well as the notes",
+                  "notes" in rows and "welcome.md" in rows, rows)
 
             def hand_to_picker(name, content):
                 """Give the picker's file input a File, as a real dialog would.

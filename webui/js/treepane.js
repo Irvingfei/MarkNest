@@ -63,13 +63,21 @@
 
   function row(entry, depth) {
     var isDir = entry.type === 'dir';
+    /* "Is this a note?" is the backend's own question and it answers with the
+       `note` boolean: library.py builds `note: _is_note(name)` and then derives
+       `type` from it - "file", rewritten to "other" when it is not a note. A
+       value of 'note' is not in that vocabulary at all, and asking for one is
+       how this row came to refuse every note it stood for. The boolean is also
+       the half the type is derived from, so it is the half that cannot disagree
+       with the backend. */
+    var isNote = !!entry.note;
     var expanded = !!state.expanded[entry.path];
     var node = UI.el('button', {
       type: 'button',
       class: 'tree-row' +
         (isDir ? ' is-dir' : '') +
         (entry.path === state.current ? ' is-current' : '') +
-        (entry.type === 'other' ? ' is-other' : ''),
+        (isDir || isNote ? '' : ' is-other'),
       title: entry.path
     });
     node.style.paddingLeft = (10 + depth * 14) + 'px';
@@ -80,7 +88,7 @@
       node.appendChild(UI.el('span', { class: 'tree-caret', text: '' }));
     }
     node.appendChild(UI.el('span', { class: 'tree-name', text: entry.name }));
-    if (entry.type === 'other') {
+    if (!isDir && !isNote) {
       node.appendChild(UI.el('span', { class: 'tree-meta', text: I18N.t('tree.unsupported') }));
     }
 
@@ -89,7 +97,7 @@
         toggleDir(entry.path);
         return;
       }
-      if (entry.type !== 'note') {
+      if (!isNote) {
         UI.toast(I18N.t('tree.unsupported'), 'warn');
         return;
       }
