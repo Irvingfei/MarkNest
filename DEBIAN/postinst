@@ -125,7 +125,7 @@ case "$1" in
         #    stopped, and the framework reads a stopped service as a broken
         #    application. The end state is asserted instead of assumed.
         if [ -n "$2" ]; then
-            echo "Upgrading marknest from version $2 to 1.0.2"
+            echo "Upgrading marknest from version $2 to 1.0.3"
             systemctl try-restart "$SERVICE" 2>/dev/null || true
         fi
         if ! systemctl is-active --quiet "$SERVICE" 2>/dev/null; then

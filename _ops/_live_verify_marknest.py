@@ -18,6 +18,12 @@ Two things this run is the only evidence for:
     AppAccessControl nginx config. `_ops/_install_web_route.py` supplies one for
     development; this asserts the result is reachable.
 
+It also carries the branch's own features the offline harness cannot settle on
+its own: the home screen the application now opens on, the menu item that comes
+back to it, and the format toolbar that edits through the editor. Those three
+meet a real TOS desktop here and nowhere else - `verify_editor.py` drives them
+against a stub, which agrees with the code by construction.
+
     python _ops/_live_verify_marknest.py
 """
 
@@ -159,7 +165,33 @@ def main():
         check("the version badge matches the package (%s)" % expected_badge,
               badge == expected_badge, badge)
 
-        print("\n5. create a note, edit it, and watch the preview follow")
+        print("\n5. the application opens on its home screen")
+        # Nothing has opened a note yet, so this is the state a person lands in.
+        # The workspace is the three-pane editor; on the home screen it carries
+        # `is-home`, which is what hides it and shows the home pane instead - so
+        # the class, not the pane's own visibility, is the fact to assert.
+        check("the workspace says it is the home view", app.evaluate(
+            "() => document.getElementById('workspace').classList.contains('is-home')"))
+        check("the home screen is the visible one", app.evaluate(
+            "() => document.getElementById('home').hidden === false"))
+        check("it offers 打开文件 and 新建文件", app.evaluate(
+            "() => !!document.getElementById('home-open') && !!document.getElementById('home-new')"))
+        # Translated, not raw keys. The two buttons rendered "home.open" on
+        # screen from the task that added them until the strings landed, and
+        # nothing else on this route notices them going missing again: the
+        # dictionaries are compared against each other, never against what the
+        # code references.
+        check("the home buttons are translated, not raw keys", app.evaluate(
+            "() => { var b = document.getElementById('home-open');"
+            " return !!b && b.textContent.indexOf('home.') !== 0; }"),
+            app.evaluate("() => (document.getElementById('home-open')||{}).textContent"))
+        # The other half of "the toolbar appears once a note is open": it must
+        # not be there while this screen is up. Asserted here, before anything
+        # opens a note, because afterwards the answer is always true.
+        check("the format bar is hidden until a note is open", app.evaluate(
+            "() => document.getElementById('format-bar').hidden === true"))
+
+        print("\n6. create a note, edit it, and watch the preview follow")
         try:
             app.wait_for_selector("#btn-more", timeout=30000)
         except Exception:  # noqa: BLE001
@@ -198,7 +230,7 @@ def main():
         check("markdown markup became markup, not text", app.evaluate(
             "() => document.querySelectorAll('#preview-body strong').length > 0"))
 
-        print("\n6. save, and read it back from the server")
+        print("\n7. save, and read it back from the server")
         app.click("#btn-save")
         page.wait_for_timeout(2500)
         check("the editor is no longer dirty", app.evaluate(
@@ -209,10 +241,80 @@ def main():
               content[:80].replace("\n", " "))
         shot(page, "_mn_12_note.png")
 
-        print("\n7. the file is where the user can see it")
+        print("\n8. the format toolbar applies its Markdown through the editor")
+        # The bar only exists once there is a note to edit, so its presence is
+        # asserted here rather than at boot. The count is what separates a bar
+        # that rendered its buttons from one that is merely visible: an empty
+        # toolbar passes a visibility check and cannot be pressed.
+        check("the format bar appears once a note is open", app.evaluate(
+            "() => document.getElementById('format-bar').hidden === false"))
+        check("it carries all thirteen buttons", app.evaluate(
+            "() => document.querySelectorAll('#format-bar .format-btn').length") == 13,
+            app.evaluate("() => document.querySelectorAll('#format-bar .format-btn').length"))
+
+        # The selection and the press go through the same route the typing above
+        # uses - the element holds focus, so the page can send the keys - rather
+        # than a second way of driving the editor. The document is snapshotted
+        # because the note already contains **bold**: a search for that markup
+        # could not fail, so the comparison of both ends is what actually
+        # depends on the press.
+        app.click(".cm-content")
+        page.keyboard.press("Control+a")
+        page.wait_for_timeout(300)
+        before_bold = app.evaluate(
+            "() => document.querySelector('.cm-content').textContent")
+        app.click("#fmt-bold")
+        page.wait_for_timeout(1500)
+        after_bold = app.evaluate(
+            "() => document.querySelector('.cm-content').textContent")
+        check("the B button wrapped the selection in ** at both ends",
+              after_bold[:2] == "**" and after_bold[-2:] == "**",
+              "%r ... %r" % (after_bold[:12], after_bold[-12:]))
+        check("the press changed the document", after_bold != before_bold,
+              "unchanged (%d chars)" % len(after_bold))
+        # The transition is the evidence that the edit travelled through the
+        # editor rather than through a second path that left the shell's own
+        # notion of the document untouched. The save above put the editor back
+        # to clean, so a dirty flag here can only come from this press.
+        check("the press marked the editor dirty", app.evaluate(
+            "() => document.getElementById('dirty-dot').hidden === false"))
+
+        print("\n9. the menu's home item returns to the home screen")
+        # The menu item is the only way back once a note is open: the workspace
+        # is what is on screen, so the home screen's own buttons are behind it.
+        # A real click is what the item needs - the menu is the application's
+        # own panel, and its items are bound to the click that a real down/up
+        # pair delivers.
+        app.click("#btn-more")
+        app.wait_for_selector("#more-menu", timeout=30000)
+        app.click("#more-home")
+        page.wait_for_timeout(3000)
+
+        check("the application is back on its home screen", app.evaluate(
+            "() => document.getElementById('workspace').classList.contains('is-home')"))
+        check("the home screen is the visible one again", app.evaluate(
+            "() => document.getElementById('home').hidden === false"))
+        check("and the fragment says so", app.evaluate("() => location.hash") == "#/home",
+              app.evaluate("() => location.hash"))
+
+        # The note lands in this list because both the create and the save above
+        # ran the indexer's own scan, not because the page remembers it. It is
+        # found by its path - the item carries `title=row.path` - rather than by
+        # the text on the row: that text is the note's first heading, a derived
+        # value which falls back to the file name once the first line no longer
+        # begins with '#', so it is not a stable thing to assert on.
+        recent_paths = app.evaluate(
+            "() => Array.from(document.querySelectorAll('#home-recent .home-recent-item'))"
+            ".map(function (node) { return node.getAttribute('title'); })")
+        check("the recent list is populated", bool(recent_paths), recent_paths)
+        check("and it lists the note this run created", note_name in (recent_paths or []),
+              recent_paths)
+        shot(page, "_mn_14_home.png")
+
+        print("\n10. the file is where the user can see it")
         print("   library path: %s" % data.get("library_path"))
 
-        print("\n8. cleaning up the note this run created")
+        print("\n11. cleaning up the note this run created")
         removed = api_call(app, "/notes?path=" + note_name, "DELETE")
         check("the test note was removed again", removed["status"] == 200, removed)
 
@@ -224,8 +326,9 @@ def main():
         print("FAILED: %s" % ", ".join(failures))
         return 1
     print("PASSED: the desktop opens MarkNest, the platform identity reaches it")
-    print("        through the proxy, and a note survives create, edit, preview,")
-    print("        save and delete.")
+    print("        through the proxy, a note survives create, edit, preview,")
+    print("        save and delete, the home screen lists it, and the format")
+    print("        toolbar edits through the editor.")
     return 0
 
 
