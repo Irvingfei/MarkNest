@@ -200,18 +200,34 @@ def main():
                   "" if items else "no recent item to click")
 
             print("\n1f. the more menu")
-            check("the menu is closed until asked for", not page.is_visible("#more-menu"))
-            page.click("#btn-more")
-            page.wait_for_timeout(300)
-            check("pressing it opens the menu", page.is_visible("#more-menu"))
-            items = page.inner_text("#more-menu")
+            # Both nodes, looked up once, and every click below is guarded by
+            # the result. page.click() on an element that does not exist raises
+            # a TimeoutError, and that exception takes sections 2 to 11 down
+            # with it - a missing menu should leave a readable failure list,
+            # for the same reason the recent-item click above is guarded.
+            has_menu = page.evaluate(
+                "() => !!document.getElementById('btn-more') "
+                "&& !!document.getElementById('more-menu')")
+            # Existence as well as visibility. is_visible() is false for a node
+            # that was never built, so a bare negation reports a menu that was
+            # never implemented as a menu that is correctly shut - which is how
+            # this line passed against a tree with no menu on it at all.
+            check("the menu is closed until asked for",
+                  has_menu and not page.is_visible("#more-menu"))
+            if has_menu:
+                page.click("#btn-more")
+                page.wait_for_timeout(300)
+            check("pressing it opens the menu",
+                  has_menu and page.is_visible("#more-menu"))
+            items = page.inner_text("#more-menu") if has_menu else ""
             for expected in ("主页", "新建文件", "打开文件"):
                 check("the menu offers %s" % expected, expected in items, items[:120])
             check("the old plus button is gone", page.evaluate(
                 "() => !document.getElementById('btn-new-note')"))
-            page.keyboard.press("Escape")
-            page.wait_for_timeout(200)
-            check("escape closes it", not page.is_visible("#more-menu"))
+            if has_menu:
+                page.keyboard.press("Escape")
+                page.wait_for_timeout(200)
+            check("escape closes it", has_menu and not page.is_visible("#more-menu"))
 
             # Spec §11 item 5. The home screen is reachable from the note view
             # only through this menu item, so this is the one place the two
@@ -219,14 +235,46 @@ def main():
             open_note_directly(page, "welcome.md")
             check("a note is open before the menu is used again", page.evaluate(
                 "() => !document.getElementById('workspace').classList.contains('is-home')"))
-            page.click("#btn-more")
-            page.wait_for_timeout(300)
-            page.click("#more-home")
-            page.wait_for_timeout(600)
-            check("the menu's home item returns to the home screen", page.evaluate(
-                "() => document.getElementById('workspace').classList.contains('is-home')"))
-            check("and the fragment says so", page.evaluate("() => location.hash") == "#/home",
+            if has_menu:
+                page.click("#btn-more")
+                page.wait_for_timeout(300)
+                page.click("#more-home")
+                page.wait_for_timeout(600)
+            check("the menu's home item returns to the home screen",
+                  has_menu and page.evaluate(
+                      "() => document.getElementById('workspace').classList.contains('is-home')"))
+            check("and the fragment says so",
+                  has_menu and page.evaluate("() => location.hash") == "#/home",
                   page.evaluate("() => location.hash"))
+
+            # The item that replaced ＋. Nothing else offline clicks it: the
+            # device script does, and that needs a device. The name is injected
+            # rather than typed into the dialog, the way the device script
+            # injects it - the library is the filesystem, so a fixed name
+            # collides with what a previous run left behind, the create is
+            # refused, and the check would fail for a reason that is not the
+            # code's.
+            if has_menu:
+                page.evaluate("""() => {
+                    window.__realPrompt = window.prompt;
+                    window.prompt = () => 'menu-created.md';
+                }""")
+                page.click("#btn-more")
+                page.wait_for_timeout(300)
+                page.click("#more-new")
+                page.wait_for_timeout(900)
+                # The real prompt goes back immediately: section 11 asks for a
+                # link address through prompt(), and a stub left in place would
+                # answer that question with a filename. Restoring beats
+                # installing a dialog handler here, which would still be
+                # registered when section 11 installs its own.
+                page.evaluate("() => { window.prompt = window.__realPrompt; }")
+            check("the menu's new-file item creates a note", has_menu and
+                  "menu-created.md" in page.inner_text("#current-path"),
+                  page.inner_text("#current-path"))
+            check("and the tree gained it", has_menu and
+                  "menu-created.md" in page.inner_text("#tree-body"),
+                  page.inner_text("#tree-body")[:120])
 
             print("\n2. opening a note")
             # Section 2 is about the click path, so the note that is already
