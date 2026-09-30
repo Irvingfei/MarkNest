@@ -329,26 +329,18 @@ git commit -m "feat(api): GET /recent, and an in-process dispatcher for the offl
 **为什么需要它：** 格式按钮要改文档。若从外部直接改 DOM，CodeMirror 的 state 不知道，于是**撤销栈、脏标记、预览刷新会同时坏掉**。把变更统一走一个 transaction 入口，三者自然同步。
 
 **Files:**
-- Modify: `webui-src/editor/index.js`
-- Test: `tools/verify_editor.py`（Task 5 会用上；本任务先只验证它存在）
+- Modify: `webui-src/editor/index.js`、`tools/webui_check.js`
+- 产出：`webui/js/vendor.editor.js`（由 `tools/webui_build.py` 重建）
 
 - [ ] **Step 1: 写失败的断言**
 
-在 `tools/verify_editor.py` 的第 1 节（`the application boots`）之后，插入：
-
-```python
-            print("\n1b. the editor exposes a single safe way to change the document")
-            check("the controller offers applyEdit", app_note_open(page) and page.evaluate(
-                "() => typeof window.MDEditor.create === 'function'"))
-```
-
-> 本步骤只断言 bundle 的导出面；真正的行为断言在第 5 节（Task 5 会替换掉这一节）。
-
-同时在 `tools/webui_check.js` 的 `VENDOR_SURFACE` 里加 `'applyEdit'`：
+断言由 `tools/webui_check.js` 承担——它已经会读 `webui/js/vendor.editor.js` 的**文本**并检查 `VENDOR_SURFACE` 里列出的每个导出面。把这个新方法加进去：
 
 ```js
 const VENDOR_SURFACE = ['create', 'render', 'applyEdit'];
 ```
+
+> **不往 `tools/verify_editor.py` 里加。** 初稿在那里写了一条 `app_note_open(page) and ...`——`app_note_open` 这个辅助函数并不存在，而且那条断言检查的是 `MDEditor.create` 而不是 `applyEdit`，即使跑起来也没验到点上。导出面是**静态事实**，用静态检查即可；真正的行为断言（改了文档之后脏标记亮起）在 Task 5，那一步才需要浏览器。
 
 - [ ] **Step 2: 运行，确认失败**
 
@@ -404,7 +396,7 @@ node tools/webui_check.js
 - [ ] **Step 5: 提交**
 
 ```bash
-git add webui-src/editor/index.js webui/js/vendor.editor.js webui/js/vendor.editor.js.sha256 tools/webui_check.js tools/verify_editor.py
+git add webui-src/editor/index.js webui/js/vendor.editor.js webui/js/vendor.editor.js.sha256 tools/webui_check.js
 git commit -m "feat(editor): one transaction entry point for programmatic edits"
 ```
 
