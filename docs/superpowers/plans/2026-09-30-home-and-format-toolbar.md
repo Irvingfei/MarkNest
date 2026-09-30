@@ -255,9 +255,19 @@ python tools/selftest.py
 
     status, payload = request("GET", "/v2/proxy/marknest/recent?limit=9999")
     check("an absurd limit is clamped rather than refused", status == 200, payload)
+    # Assert the clamp's own output, not an upper bound. `len(...) <= 50` is
+    # satisfied by any library holding fewer than 50 notes - which the test
+    # library always does - and is also satisfied by an empty list from an error
+    # response. The echoed `limit` is what the clamp actually produced.
     check("and clamped to the documented ceiling",
-          len((payload.get("data") or {}).get("recent") or []) <= 50, payload)
+          (payload.get("data") or {}).get("limit") == 50, payload)
 ```
+
+> **初稿在这里写的两条断言都是假的**，而且当时套件是全绿的：
+> - `len(...) <= 50` 恒真（测试库只有 7 篇笔记）
+> - 把路由删掉后 `recent` 得到 `[]`，`0 <= 50` 照样成立——**它在 404 信封上通过**
+>
+> 代价不是"跑不起来"，是**跑了、全绿、什么都没验**。变异测试（删掉 `min(limit, 50)`）才是唯一能发现它的手段，因此 Task 2 的审查必须以变异测试为准。
 
 - [ ] **Step 4: 运行，确认失败**
 
