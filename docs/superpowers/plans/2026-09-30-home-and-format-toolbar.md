@@ -403,13 +403,32 @@ node tools/webui_check.js
     /**
      * Apply a change produced by a pure command function.
      *
-     * Everything that edits the document goes through here, and that is the
-     * point: a change dispatched as a CodeMirror transaction lands in the undo
-     * history, notifies the update listener that drives the dirty flag and the
-     * preview, and cannot leave the view and the state disagreeing. Writing to
-     * the DOM instead would break all three at once.
+     * This is the entry point for commands that EDIT the document - distinct
+     * from setValue below, which loads a whole document, and setReadOnly,
+     * which dispatches an effect with no change. Routing edits through one
+     * place is the point: a CodeMirror transaction lands in the undo history,
+     * notifies the update listener that drives the dirty flag and the preview,
+     * and cannot leave the view and the state disagreeing. Writing to the DOM
+     * instead would break all three at once.
+     *
+     * `command` is called with the document and the current selection -
+     * `{doc, from, to, selected}` - and returns `{changes, selection}`, where
+     * `changes` is a CodeMirror change spec using absolute offsets. A command
+     * that returns nothing, or returns no `changes`, is ignored; every shipped
+     * command returns one, so that guard is defensive rather than load-bearing.
+     *
+     * A read-only note is refused here rather than in the toolbar, because this
+     * is the single entry point and a caller added later cannot forget the
+     * check. CodeMirror's EditorState.readOnly gates user input only - a
+     * programmatic transaction still applies, which is exactly what setValue
+     * relies on - so without this a format button on a note the user cannot
+     * write would edit it, raise the dirty flag, and then have its save
+     * refused.
      */
     applyEdit(command) {
+      if (view.state.readOnly) {
+        return;
+      }
       const main = view.state.selection.main;
       const result = command({
         doc: view.state.doc.toString(),
@@ -427,6 +446,8 @@ node tools/webui_check.js
       view.focus();
     },
 ```
+
+> **只读守卫是规格级要求，不是可选的加固。** 应用有真实的只读笔记模式（`setReadOnly(!note.writable)`，用于权限不足或 SMB 归属的笔记），而 `FormatBar.setEnabled` 只区分主页与笔记两种状态，**挡不住这个**。缺了它，Task 5 会交付一个「点了能改、但改完存不了」的按钮。
 
 - [ ] **Step 4: 重新构建 bundle 并验证**
 
