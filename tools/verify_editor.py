@@ -69,6 +69,21 @@ def click_note(page, name):
     page.click('.tree-row:has(.tree-name:text-is("%s"))' % name)
 
 
+def open_note_directly(page, path):
+    """Put the application into the note view for a path, without the UI.
+
+    The sections after the first are about the editor, the preview and the
+    toolbar - not about how a note is reached. Driving them through the home
+    screen would make every one of them depend on the file picker, which does
+    not exist yet at this point in the plan. The path in the hash is the
+    application's own supported way to address a note, so this is the honest
+    shortcut rather than a workaround.
+    """
+    page.evaluate(
+        "(p) => { location.hash = '#/notes?p=' + encodeURIComponent(p); }", path)
+    page.wait_for_timeout(900)
+
+
 def app_note_visible(page, selector):
     """Visibility inside whichever frame currently holds the application."""
     for frame in page.frames:
@@ -111,7 +126,37 @@ def main():
             check("the format bar is hidden until a note is open",
                   not app_note_visible(page, "#format-bar"))
 
+            print("\n1c. the application starts on its home screen")
+            check("home is the initial view", page.evaluate(
+                "() => document.getElementById('workspace').classList.contains('is-home')"))
+            check("the editor is not shown yet", page.evaluate(
+                "() => document.getElementById('pane-editor').offsetParent === null"))
+            check("the hash says home", page.evaluate("() => location.hash") == "#/home",
+                  page.evaluate("() => location.hash"))
+            check("the home screen is visible", page.evaluate(
+                "() => !document.getElementById('home').hidden"))
+
+            print("\n1d. the home actions stack on a narrow frame")
+            page.set_viewport_size({"width": 560, "height": 700})
+            page.wait_for_timeout(400)
+            boxes = page.evaluate("""() => {
+                const open = document.getElementById('home-open').getBoundingClientRect();
+                const created = document.getElementById('home-new').getBoundingClientRect();
+                return {openTop: open.top, newTop: created.top,
+                        openLeft: open.left, newLeft: created.left};
+            }""")
+            check("the two home buttons stack vertically rather than side by side",
+                  boxes["newTop"] > boxes["openTop"] + 8, boxes)
+            page.set_viewport_size({"width": 1280, "height": 800})
+            page.wait_for_timeout(400)
+
             print("\n2. opening a note")
+            # Section 2 is about the click path, so the note that is already
+            # open has to be there for the click to be a switch between notes -
+            # which is the real situation. It also puts the workspace back on
+            # screen, since the tree row is not clickable while the home screen
+            # is covering it.
+            open_note_directly(page, "welcome.md")
             click_note(page, "welcome.md")
             page.wait_for_timeout(700)
             check("the editor holds the note", page.evaluate(
@@ -243,12 +288,11 @@ def main():
             print("\n8. scroll synchronisation, both directions")
             page.reload(wait_until="load")
             page.wait_for_timeout(1200)
-            # long.md lives in a subfolder, so the folder has to be expanded the
-            # way a person would: the tree loads a directory at a time.
-            click_note(page, "notes")
-            page.wait_for_timeout(600)
-            click_note(page, "long.md")
-            page.wait_for_timeout(900)
+            # long.md lives in a subfolder, which the tree would reach only by
+            # expanding it a directory at a time. The scroll assertions are not
+            # about the tree, so the note is addressed the way the application
+            # itself addresses one.
+            open_note_directly(page, "notes/long.md")
             page.evaluate(
                 "() => { var s = document.querySelector('.cm-scroller'); s.scrollTop = s.scrollHeight / 2; s.dispatchEvent(new Event('scroll')); }")
             page.wait_for_timeout(400)

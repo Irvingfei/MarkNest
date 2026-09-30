@@ -117,6 +117,35 @@
 
   /* ------------------------------------------------------------------ route */
 
+  var view = { name: null };
+
+  /* Two states, derived from whether a note is open rather than stored
+     separately - a stored flag and an open note can disagree, and then the
+     screen shows one thing and the hash says another. */
+  function setView(name) {
+    if (view.name === name) {
+      return;
+    }
+    view.name = name;
+    var home = document.getElementById('home');
+    var workspace = document.getElementById('workspace');
+    if (home) {
+      home.hidden = name !== 'home';
+    }
+    if (workspace) {
+      workspace.classList.toggle('is-home', name === 'home');
+    }
+    if (global.FormatBar) {
+      global.FormatBar.setEnabled(name === 'note');
+    }
+    // Hiding the workspace takes it out of layout, so applyWidth() reads a
+    // width of 0 while the home screen is up and records that as "collapse
+    // every pane". The width is therefore re-read on every view change and not
+    // only on resize - otherwise the workspace comes back with its tree and
+    // preview still collapsed after any visit to the home screen.
+    applyWidth();
+  }
+
   function pageFromHash() {
     var raw = (global.location.hash || '').replace(/^#\/?/, '');
     var queryStart = raw.indexOf('?');
@@ -137,26 +166,39 @@
       });
       raw = raw.slice(0, queryStart);
     }
-    return { page: raw || 'notes', params: params };
+    return { page: raw || 'home', params: params };
   }
 
   function writeHash(path) {
-    var next = '#/notes' + (path ? '?p=' + encodeURIComponent(path) : '');
+    var next = path ? '#/notes?p=' + encodeURIComponent(path) : '#/home';
     if (global.location.hash !== next) {
       global.location.hash = next;
     }
   }
 
+  function showHome(push) {
+    setView('home');
+    if (global.TreePane) {
+      global.TreePane.setCurrent('');
+    }
+    setTitle('');
+    if (push) {
+      writeHash('');
+    }
+    if (global.HomePane) {
+      global.HomePane.reload();
+    }
+  }
+
   function openNote(path, push) {
+    if (!path) {
+      showHome(push);
+      return Promise.resolve();
+    }
     setTitle(path);
+    setView('note');
     if (global.TreePane) {
       global.TreePane.setCurrent(path);
-    }
-    if (global.FormatBar) {
-      // Task 6 replaces this with the view state machine, which is what will
-      // decide where the bar belongs; until it exists, opening a note is the
-      // only signal there is.
-      global.FormatBar.setEnabled(!!path);
     }
     if (push) {
       writeHash(path);
@@ -233,7 +275,17 @@
 
     global.addEventListener('hashchange', function () {
       var route = pageFromHash();
-      if (route.page === 'notes' && route.params.p !== global.TreePane.current()) {
+      // Both pages are routed, and the home branch checks the current view
+      // first: boot normalises an empty fragment to #/home, and without that
+      // guard the assignment would come straight back through here and reload
+      // the home pane a second time.
+      if (route.page === 'home') {
+        if (view.name !== 'home') {
+          showHome(false);
+        }
+        return;
+      }
+      if (route.params.p !== global.TreePane.current()) {
         openNote(route.params.p || '', false);
       }
     });
@@ -269,6 +321,15 @@
       global.FormatBar.init();
     });
 
+    step('home', function () {
+      // HomePane does not exist yet; the guard is the same pattern the
+      // neighbouring steps use, and it keeps this step from being the one that
+      // aborts the rest of startup.
+      if (global.HomePane) {
+        global.HomePane.init({ onOpen: openNote });
+      }
+    });
+
     step('preview', function () {
       global.PreviewPane.init();
       var button = document.getElementById('btn-preview-toggle');
@@ -295,6 +356,12 @@
         var route = pageFromHash();
         if (route.params.p) {
           openNote(route.params.p, false);
+        } else {
+          // The spec's fragment is the only thing that survives a reload of
+          // the iframe, so it has to name the view that is actually on screen
+          // - an empty hash and a home screen disagree about where the user is.
+          showHome(false);
+          writeHash('');
         }
       });
     });
