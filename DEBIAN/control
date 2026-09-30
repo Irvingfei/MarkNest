@@ -1,0 +1,13 @@
+Package: marknest
+Version: 1.0.2
+Architecture: amd64
+Section: utils
+Priority: optional
+Maintainer: TerraMaster Community Developer <dev@example.com>
+Depends: python3 (>= 3.10), systemd
+Installed-Size: 0
+Description: MarkNest - Markdown notes for TOS
+ A Markdown note library that keeps your notes as ordinary .md files in a
+ shared folder on the NAS. Browse, edit and preview them with a split-pane
+ editor, search across every note, and reach the same files from the File
+ Manager or over SMB.

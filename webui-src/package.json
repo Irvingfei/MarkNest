@@ -1,0 +1,26 @@
+{
+  "name": "marknest-webui-src",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Source for the MarkNest editor bundle. Development-time only: the built artefact is committed under webui/js/ and the package never depends on Node.",
+  "type": "module",
+  "scripts": {
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@codemirror/commands": "^6.7.1",
+    "@codemirror/lang-markdown": "^6.3.1",
+    "@codemirror/search": "^6.5.8",
+    "@codemirror/state": "^6.4.1",
+    "@codemirror/view": "^6.34.1",
+    "codemirror": "^6.0.1",
+    "dompurify": "^3.1.7",
+    "markdown-it": "^14.1.0",
+    "markdown-it-anchor": "^9.2.0",
+    "markdown-it-footnote": "^4.0.0",
+    "markdown-it-task-lists": "^2.1.1"
+  },
+  "devDependencies": {
+    "vite": "^5.4.10"
+  }
+}

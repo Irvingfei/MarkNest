@@ -1,0 +1,97 @@
+[zh-cn]
+name = "MarkNest 笔记"
+auth = "TerraMaster 社区开发者"
+descript = "把笔记以普通 .md 文件的形式保存在 NAS 的共享文件夹里。以目录树浏览，用分栏编辑器边写边看实时预览，并可对全部笔记做全文搜索。因为是普通文件，你也能在文件管理器里直接打开、通过 SMB 拷走，并由卷快照保留历史版本。"
+release_note = "1. 首个版本发布。2. 基于共享文件夹的笔记目录树。3. 分栏 Markdown 编辑器，实时预览与滚动同步。4. 保存时检测冲突。5. 全部笔记的全文搜索。6. 每位用户独立的笔记库。"
+important = "笔记保存在应用安装时创建的共享文件夹 marknest-data 中。每位用户只能看到自己的笔记库。卸载应用不会删除该文件夹。"
+
+[zh-hk]
+name = "MarkNest 筆記"
+auth = "TerraMaster 社群開發者"
+descript = "把筆記以普通 .md 檔案的形式保存在 NAS 的共享資料夾裡。以目錄樹瀏覽，用分欄編輯器邊寫邊看即時預覽，並可對全部筆記做全文搜尋。因為是普通檔案，你也能在檔案管理員裡直接開啟、透過 SMB 拷走，並由卷快照保留歷史版本。"
+release_note = "1. 首個版本發布。2. 基於共享資料夾的筆記目錄樹。3. 分欄 Markdown 編輯器，即時預覽與捲動同步。4. 儲存時偵測衝突。5. 全部筆記的全文搜尋。6. 每位使用者獨立的筆記庫。"
+important = "筆記保存在應用安裝時建立的共享資料夾 marknest-data 中。每位使用者只能看到自己的筆記庫。解除安裝不會刪除該資料夾。"
+
+[en-us]
+name = "MarkNest"
+auth = "TerraMaster Community Developer"
+descript = "A Markdown note library that keeps your notes as ordinary .md files in a shared folder on the NAS. Browse them as a tree, edit in a split-pane Markdown editor with live preview, and search across every note. Because the notes are plain files, you can also open them from the File Manager, copy them over SMB, and rely on volume snapshots to keep their history."
+release_note = "1. First release. 2. Note tree over a shared folder. 3. Split-pane Markdown editor with live preview and scroll sync. 4. Saving detects conflicts. 5. Full-text search across every note. 6. A separate library for each user."
+important = "Notes are kept in a shared folder named marknest-data that the application creates when it is installed. Each user sees only their own library. Uninstalling the application never deletes that folder."
+
+[fr-fr]
+name = "MarkNest"
+auth = "Développeur communautaire TerraMaster"
+descript = "A Markdown note library that keeps your notes as ordinary .md files in a shared folder on the NAS. Browse them as a tree, edit in a split-pane Markdown editor with live preview, and search across every note. Because the notes are plain files, you can also open them from the File Manager, copy them over SMB, and rely on volume snapshots to keep their history."
+release_note = "1. First release. 2. Note tree over a shared folder. 3. Split-pane Markdown editor with live preview and scroll sync. 4. Saving detects conflicts. 5. Full-text search across every note. 6. A separate library for each user."
+important = "Notes are kept in a shared folder named marknest-data that the application creates when it is installed. Each user sees only their own library. Uninstalling the application never deletes that folder."
+
+[de-de]
+name = "MarkNest"
+auth = "TerraMaster Community-Entwickler"
+descript = "A Markdown note library that keeps your notes as ordinary .md files in a shared folder on the NAS. Browse them as a tree, edit in a split-pane Markdown editor with live preview, and search across every note. Because the notes are plain files, you can also open them from the File Manager, copy them over SMB, and rely on volume snapshots to keep their history."
+release_note = "1. First release. 2. Note tree over a shared folder. 3. Split-pane Markdown editor with live preview and scroll sync. 4. Saving detects conflicts. 5. Full-text search across every note. 6. A separate library for each user."
+important = "Notes are kept in a shared folder named marknest-data that the application creates when it is installed. Each user sees only their own library. Uninstalling the application never deletes that folder."
+
+[it-it]
+name = "MarkNest"
+auth = "Sviluppatore della community TerraMaster"
+descript = "A Markdown note library that keeps your notes as ordinary .md files in a shared folder on the NAS. Browse them as a tree, edit in a split-pane Markdown editor with live preview, and search across every note. Because the notes are plain files, you can also open them from the File Manager, copy them over SMB, and rely on volume snapshots to keep their history."
+release_note = "1. First release. 2. Note tree over a shared folder. 3. Split-pane Markdown editor with live preview and scroll sync. 4. Saving detects conflicts. 5. Full-text search across every note. 6. A separate library for each user."
+important = "Notes are kept in a shared folder named marknest-data that the application creates when it is installed. Each user sees only their own library. Uninstalling the application never deletes that folder."
+
+[es-es]
+name = "MarkNest"
+auth = "Desarrollador de la comunidad TerraMaster"
+descript = "A Markdown note library that keeps your notes as ordinary .md files in a shared folder on the NAS. Browse them as a tree, edit in a split-pane Markdown editor with live preview, and search across every note. Because the notes are plain files, you can also open them from the File Manager, copy them over SMB, and rely on volume snapshots to keep their history."
+release_note = "1. First release. 2. Note tree over a shared folder. 3. Split-pane Markdown editor with live preview and scroll sync. 4. Saving detects conflicts. 5. Full-text search across every note. 6. A separate library for each user."
+important = "Notes are kept in a shared folder named marknest-data that the application creates when it is installed. Each user sees only their own library. Uninstalling the application never deletes that folder."
+
+[hu-hu]
+name = "MarkNest"
+auth = "TerraMaster közösségi fejlesztő"
+descript = "A Markdown note library that keeps your notes as ordinary .md files in a shared folder on the NAS. Browse them as a tree, edit in a split-pane Markdown editor with live preview, and search across every note. Because the notes are plain files, you can also open them from the File Manager, copy them over SMB, and rely on volume snapshots to keep their history."
+release_note = "1. First release. 2. Note tree over a shared folder. 3. Split-pane Markdown editor with live preview and scroll sync. 4. Saving detects conflicts. 5. Full-text search across every note. 6. A separate library for each user."
+important = "Notes are kept in a shared folder named marknest-data that the application creates when it is installed. Each user sees only their own library. Uninstalling the application never deletes that folder."
+
+[ja-jp]
+name = "MarkNest"
+auth = "TerraMaster コミュニティ開発者"
+descript = "A Markdown note library that keeps your notes as ordinary .md files in a shared folder on the NAS. Browse them as a tree, edit in a split-pane Markdown editor with live preview, and search across every note. Because the notes are plain files, you can also open them from the File Manager, copy them over SMB, and rely on volume snapshots to keep their history."
+release_note = "1. First release. 2. Note tree over a shared folder. 3. Split-pane Markdown editor with live preview and scroll sync. 4. Saving detects conflicts. 5. Full-text search across every note. 6. A separate library for each user."
+important = "Notes are kept in a shared folder named marknest-data that the application creates when it is installed. Each user sees only their own library. Uninstalling the application never deletes that folder."
+
+[ko-kr]
+name = "MarkNest"
+auth = "TerraMaster 커뮤니티 개발자"
+descript = "A Markdown note library that keeps your notes as ordinary .md files in a shared folder on the NAS. Browse them as a tree, edit in a split-pane Markdown editor with live preview, and search across every note. Because the notes are plain files, you can also open them from the File Manager, copy them over SMB, and rely on volume snapshots to keep their history."
+release_note = "1. First release. 2. Note tree over a shared folder. 3. Split-pane Markdown editor with live preview and scroll sync. 4. Saving detects conflicts. 5. Full-text search across every note. 6. A separate library for each user."
+important = "Notes are kept in a shared folder named marknest-data that the application creates when it is installed. Each user sees only their own library. Uninstalling the application never deletes that folder."
+
+[pl-pl]
+name = "MarkNest"
+auth = "Programista społeczności TerraMaster"
+descript = "A Markdown note library that keeps your notes as ordinary .md files in a shared folder on the NAS. Browse them as a tree, edit in a split-pane Markdown editor with live preview, and search across every note. Because the notes are plain files, you can also open them from the File Manager, copy them over SMB, and rely on volume snapshots to keep their history."
+release_note = "1. First release. 2. Note tree over a shared folder. 3. Split-pane Markdown editor with live preview and scroll sync. 4. Saving detects conflicts. 5. Full-text search across every note. 6. A separate library for each user."
+important = "Notes are kept in a shared folder named marknest-data that the application creates when it is installed. Each user sees only their own library. Uninstalling the application never deletes that folder."
+
+[ru-ru]
+name = "MarkNest"
+auth = "Разработчик сообщества TerraMaster"
+descript = "A Markdown note library that keeps your notes as ordinary .md files in a shared folder on the NAS. Browse them as a tree, edit in a split-pane Markdown editor with live preview, and search across every note. Because the notes are plain files, you can also open them from the File Manager, copy them over SMB, and rely on volume snapshots to keep their history."
+release_note = "1. First release. 2. Note tree over a shared folder. 3. Split-pane Markdown editor with live preview and scroll sync. 4. Saving detects conflicts. 5. Full-text search across every note. 6. A separate library for each user."
+important = "Notes are kept in a shared folder named marknest-data that the application creates when it is installed. Each user sees only their own library. Uninstalling the application never deletes that folder."
+
+[tr-tr]
+name = "MarkNest"
+auth = "TerraMaster topluluk geliştiricisi"
+descript = "A Markdown note library that keeps your notes as ordinary .md files in a shared folder on the NAS. Browse them as a tree, edit in a split-pane Markdown editor with live preview, and search across every note. Because the notes are plain files, you can also open them from the File Manager, copy them over SMB, and rely on volume snapshots to keep their history."
+release_note = "1. First release. 2. Note tree over a shared folder. 3. Split-pane Markdown editor with live preview and scroll sync. 4. Saving detects conflicts. 5. Full-text search across every note. 6. A separate library for each user."
+important = "Notes are kept in a shared folder named marknest-data that the application creates when it is installed. Each user sees only their own library. Uninstalling the application never deletes that folder."
+
+[pt-pt]
+name = "MarkNest"
+auth = "Programador da comunidade TerraMaster"
+descript = "A Markdown note library that keeps your notes as ordinary .md files in a shared folder on the NAS. Browse them as a tree, edit in a split-pane Markdown editor with live preview, and search across every note. Because the notes are plain files, you can also open them from the File Manager, copy them over SMB, and rely on volume snapshots to keep their history."
+release_note = "1. First release. 2. Note tree over a shared folder. 3. Split-pane Markdown editor with live preview and scroll sync. 4. Saving detects conflicts. 5. Full-text search across every note. 6. A separate library for each user."
+important = "Notes are kept in a shared folder named marknest-data that the application creates when it is installed. Each user sees only their own library. Uninstalling the application never deletes that folder."

@@ -1,0 +1,36 @@
+[Unit]
+Description=MarkNest for TOS
+Documentation=https://github.com/terramaster-tos/tos-app-pkg-tools
+After=network.target
+
+# A short start-limit window turns a transient failure into a permanently
+# failed unit, which the TOS app framework reports as "the app disabled
+# itself". Keep a generous window so recoverable errors can retry.
+StartLimitBurst=10
+StartLimitIntervalSec=120
+
+[Service]
+Type=simple
+User=marknest
+Group=marknest
+WorkingDirectory=/usr/local/marknest
+ExecStart=/usr/local/marknest/bin/marknest-server
+EnvironmentFile=-/usr/local/marknest/marknest.env
+TimeoutStartSec=30
+TimeoutStopSec=10
+
+# Hardening is deliberately limited to directives that do NOT require systemd to
+# build a mount namespace. On TOS, /var and several standard paths are symlinks
+# into /tmp; namespace based options (PrivateTmp, ProtectSystem, ProtectHome,
+# ReadWritePaths) make systemd fail while preparing /run/systemd/unit-root and
+# the unit then exits with status=226/NAMESPACE before the program is reached.
+# The service therefore runs as an unprivileged account with no new privileges,
+# and relies on filesystem ownership for isolation.
+NoNewPrivileges=true
+
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

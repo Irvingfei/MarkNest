@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="MarkNest">
+  <!-- A sheet of notes with a folded corner. The application's whole subject is
+       a folder of ordinary Markdown files, so the mark is the file itself
+       rather than an abstract symbol, and it stays legible at 32px where a
+       busier drawing would turn to mud.
+       Transparent background on purpose: the platform composites the icon over
+       its own surfaces, and a filled square would show as a tile. -->
+  <path d="M120 64 H296 V160 H392 V448 a32 32 0 0 1 -32 32 H120 a32 32 0 0 1 -32 -32 V96 a32 32 0 0 1 32 -32 Z"
+        fill="#2b5fd9"/>
+  <path d="M296 64 L392 160 L296 160 Z" fill="#5b8cf5"/>
+  <g fill="#ffffff">
+    <rect x="152" y="216" width="144" height="26" rx="13"/>
+    <rect x="152" y="274" width="176" height="26" rx="13"/>
+    <rect x="152" y="332" width="120" height="26" rx="13"/>
+  </g>
+</svg>

@@ -1,0 +1,21 @@
+#!/bin/bash
+# prerm - executed before the package is removed or upgraded
+set -e
+
+APPID="marknest"
+SERVICE="$APPID.service"
+
+case "$1" in
+    remove|upgrade|deconfigure|failed-upgrade)
+        # Stop the service gracefully. The application also handles SIGTERM and
+        # removes /var/api/marknest.sock on shutdown.
+        systemctl stop "$SERVICE" 2>/dev/null || true
+        if [ "$1" = "remove" ]; then
+            systemctl disable "$SERVICE" 2>/dev/null || true
+        fi
+        ;;
+    *)
+        ;;
+esac
+
+exit 0

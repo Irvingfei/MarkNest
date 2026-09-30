@@ -1,0 +1,51 @@
+#!/bin/bash
+# preinst - executed before the package files are unpacked
+set -e
+
+APPID="marknest"
+
+# 1. Create the dedicated system user and group. Running as root is prohibited.
+if ! getent group "$APPID" >/dev/null 2>&1; then
+    groupadd -r "$APPID" 2>/dev/null || true
+fi
+if ! id -u "$APPID" >/dev/null 2>&1; then
+    useradd -r -g "$APPID" -d "/usr/local/$APPID" -s /usr/sbin/nologin "$APPID" 2>/dev/null \
+        || useradd -r -d "/usr/local/$APPID" -s /bin/false "$APPID" 2>/dev/null || true
+fi
+
+# 2. The application deliberately does NOT join "allusers".
+#
+#    A note library touches exactly one folder: the one this package creates for
+#    itself in postinst with the platform's own ter_share_add, which gives the
+#    application account full access without the operator authorising anything.
+#    Joining "allusers" is a request for access to the operator's *other* shared
+#    folders, and this application has no reason to want that - so it does not
+#    ask, and the reviewer question "why does a note app want to see my folders"
+#    never has to be answered.
+#
+#    Worth recording for whoever reads this next: on TOS 7 that membership is
+#    only a request in any case. Measured on a real device, adding it grants
+#    nothing by itself - each folder's SPC ACL decides, and the operator grants
+#    it in the control panel. Nothing here escalates privilege.
+
+# 3. Socket directory owned by the service user (the server then chmods the
+#    socket itself to 0660).
+mkdir -p /var/api
+chown "$APPID:$APPID" /var/api 2>/dev/null || true
+chmod 0755 /var/api
+
+# 4. Runtime data directories.
+#
+#    The index database lives here, deliberately outside the shared folder: the
+#    user's File Manager and SMB listings should show notes and attachments and
+#    nothing else, and a SQLite file with its -wal and -shm siblings sitting
+#    next to their writing would be both baffling and easy to corrupt.
+mkdir -p "/usr/local/$APPID/data" "/usr/local/$APPID/data/tmp" "/usr/local/$APPID/logs"
+chown -R "$APPID:$APPID" "/usr/local/$APPID/data" "/usr/local/$APPID/logs" 2>/dev/null || true
+
+# 5. Upgrade path: stop the running instance so the new binary starts cleanly.
+if [ "$1" = "upgrade" ]; then
+    systemctl stop "$APPID.service" 2>/dev/null || true
+fi
+
+exit 0

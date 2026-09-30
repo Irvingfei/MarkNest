@@ -1,0 +1,145 @@
+#!/bin/bash
+# postinst - executed after the package files have been unpacked
+set -e
+
+APPID="marknest"
+ROOT="/usr/local/$APPID"
+SERVICE="$APPID.service"
+SHARE="$APPID-data"
+
+case "$1" in
+    configure)
+        # 1. Re-assert ownership and permissions on package payload.
+        chown -R "$APPID:$APPID" "$ROOT" 2>/dev/null || true
+        # The package is sometimes produced on a platform that cannot record
+        # POSIX modes (a Windows build reports 0666 for every regular file),
+        # so the installed tree is normalised here instead of trusting the
+        # archive: directories 0755, data files 0644, no group/world write.
+        # The private data/ and logs/ trees are tightened again just below.
+        chmod -R u=rwX,go=rX "$ROOT" 2>/dev/null || true
+        chmod 0755 "$ROOT/bin/marknest-server" 2>/dev/null || true
+        mkdir -p "$ROOT/data" "$ROOT/data/tmp" "$ROOT/logs"
+        chown -R "$APPID:$APPID" "$ROOT/data" "$ROOT/logs" 2>/dev/null || true
+        chmod 0700 "$ROOT/data" "$ROOT/logs" 2>/dev/null || true
+        chmod 0750 "$ROOT/data/tmp" 2>/dev/null || true
+
+        # 2. Remove stale bytecode caches.
+        #
+        #    The build pins every source file's mtime to the epoch so the package
+        #    is reproducible, and the interpreter validates a .pyc against the
+        #    source's mtime and size. An edit that keeps the byte length - a
+        #    version literal is the usual case - therefore leaves the cached
+        #    bytecode looking valid, and the service silently keeps executing the
+        #    previous release's code with nothing to show for it in any log. The
+        #    caches are not ours to begin with: dpkg never installs them, they are
+        #    written by whoever ran the server by hand during a diagnostic, so an
+        #    upgrade walks straight past them. Clearing them here makes the
+        #    interpreter compile from the sources that were just unpacked.
+        #
+        #    $ROOT is a symlink into the volume on a TOS installation, and find
+        #    does not follow a symlink given as its starting point - it would
+        #    silently walk nothing and report success - so resolve it first.
+        REAL_ROOT="$(readlink -f "$ROOT" 2>/dev/null || echo "$ROOT")"
+        find "$REAL_ROOT" -name '__pycache__' -type d -prune -exec rm -rf {} + 2>/dev/null || true
+
+        # 3. Remove a stale socket left over by a previous installation.
+        rm -f "/var/api/$APPID.sock" 2>/dev/null || true
+
+        # 4. Create the application's own shared folder.
+        #
+        #    This is the whole storage story. Notes are ordinary .md files in a
+        #    normal TOS shared folder, so the operator sees them in the File
+        #    Manager, reaches them over SMB, and gets version history from the
+        #    volume snapshots without the application implementing any of it.
+        #
+        #    ter_share_add is the platform's own tool for creating such a folder
+        #    and the only sanctioned way to obtain one the application account
+        #    can write to without the operator granting anything. Measured on
+        #    TOS 7: it creates the folder with the SPC ACL in place, registers it
+        #    in smb.conf, and a second call returns the same path and changes
+        #    nothing.
+        #
+        #    Failure is not fatal. If the tool is absent or refuses, the service
+        #    still starts and reports its library as unavailable, which is a far
+        #    better outcome than failing the installation of the whole package
+        #    over one directory.
+        VOLUME="$(ls -d /Volume* 2>/dev/null | head -1)"
+        SHARE_ROOT=""
+        [ -n "$VOLUME" ] && SHARE_ROOT="$VOLUME/$SHARE"
+
+        READY=0
+        [ -d "$SHARE_ROOT" ] && READY=1
+        if [ "$READY" = "0" ] && [ -n "$VOLUME" ] && command -v ter_share_add >/dev/null 2>&1; then
+            ter_share_add -device "$(basename "$VOLUME")" -name "$SHARE" -owner "$APPID" >/dev/null 2>&1 || true
+            [ -d "$SHARE_ROOT" ] && READY=1
+        fi
+
+        if [ "$READY" = "1" ]; then
+            echo "notes library: $SHARE_ROOT"
+            mkdir -p "$SHARE_ROOT/users" 2>/dev/null || true
+            chown -R "$APPID:$APPID" "$SHARE_ROOT/users" 2>/dev/null || true
+        else
+            echo "WARNING: the notes shared folder '$SHARE' could not be created."
+            echo "         The application will start and report its library as unavailable."
+        fi
+
+        # 5. Make the package self-sufficient under a plain dpkg -i.
+        #
+        #    When the platform installs an application it unpacks webui.bz2 into
+        #    $ROOT/webui and points /usr/www/<appid> at it. A developer
+        #    installing the .deb by hand gets neither - and the result is an
+        #    application that installs cleanly, starts cleanly, answers /health,
+        #    and serves a 404 for its own page. Doing both here is idempotent:
+        #    if the platform already created them, nothing is disturbed.
+        if [ -f "$ROOT/webui.bz2" ]; then
+            mkdir -p "$ROOT/webui"
+            tar -xjf "$ROOT/webui.bz2" -C "$ROOT/webui" 2>/dev/null || true
+        fi
+        if [ -d "$ROOT/webui" ]; then
+            chown -R root:root "$ROOT/webui" 2>/dev/null || true
+            chmod -R a+rX "$ROOT/webui" 2>/dev/null || true
+        fi
+
+        # nginx serves /<appid>/ through this link. Created only when absent, so
+        # a link the platform manages is never re-pointed underneath it.
+        if [ ! -e "/usr/www/$APPID" ]; then
+            ln -s "$ROOT/webui" "/usr/www/$APPID" 2>/dev/null || true
+        fi
+
+        # 6. Install and register the systemd unit.
+        if [ -f "$ROOT/init.d/$SERVICE" ]; then
+            cp -f "$ROOT/init.d/$SERVICE" "/etc/systemd/system/$SERVICE"
+            chmod 0644 "/etc/systemd/system/$SERVICE"
+            systemctl daemon-reload 2>/dev/null || true
+            systemctl enable "$SERVICE" 2>/dev/null || true
+        fi
+
+        # 7. Bring the service up.
+        #
+        #    Data lives in $ROOT/data and is intentionally preserved, so an
+        #    upgrade restarts the running instance rather than leaving it to
+        #    notice the new files. `try-restart` acts only on a unit that is
+        #    already running - and reports success when it does nothing, which
+        #    is why the `start` that used to sit beside it could never fire: an
+        #    upgrade performed while the service happened to be stopped left it
+        #    stopped, and the framework reads a stopped service as a broken
+        #    application. The end state is asserted instead of assumed.
+        if [ -n "$2" ]; then
+            echo "Upgrading marknest from version $2 to 1.0.2"
+            systemctl try-restart "$SERVICE" 2>/dev/null || true
+        fi
+        if ! systemctl is-active --quiet "$SERVICE" 2>/dev/null; then
+            systemctl start "$SERVICE" 2>/dev/null || true
+        fi
+        ;;
+
+    abort-upgrade|abort-remove|abort-deconfigure)
+        ;;
+
+    *)
+        echo "postinst called with unknown argument '$1'" >&2
+        exit 1
+        ;;
+esac
+
+exit 0
