@@ -37,6 +37,27 @@ def check(label, condition, detail=""):
     return bool(condition)
 
 
+def first_difference(before, after):
+    """Where two renderings first disagree, for a failure detail that reads.
+
+    "The strings are not equal" says the check failed but not what moved. The
+    preview is one long HTML string, so pointing at the first differing
+    character - with a little either side - is the difference between a failed
+    assertion and an answer.
+    """
+    limit = min(len(before), len(after))
+    for index in range(limit):
+        if before[index] != after[index]:
+            start = max(0, index - 24)
+            return "%d: %r -> %r" % (
+                index, before[start:index + 24], after[start:index + 24])
+    if len(before) != len(after):
+        start = max(0, limit - 24)
+        return "%d (length %d -> %d): %r -> %r" % (
+            limit, len(before), len(after), before[start:], after[start:])
+    return "identical (%d chars)" % len(before)
+
+
 def click_note(page, name):
     """Click a tree row by its exact name.
 
@@ -124,18 +145,50 @@ def main():
                 "() => { var b = document.getElementById('fmt-bold');"
                 " return !!b && b.getAttribute('title').indexOf('format.') !== 0; }"),
                 page.evaluate("() => (document.getElementById('fmt-bold')||{}).title"))
+            # The dirty flag is cleared before anything is asserted about it.
+            # Section 3 typed into the note and never saved, so "the editor is
+            # dirty" was already true on arrival and a press that did nothing
+            # satisfied it. The save leaves section 5 alone: it counts the saves
+            # in a slice of the request log it snapshots after this point.
+            page.click("#btn-save")
+            page.wait_for_timeout(800)
+            check("the toolbar starts from a clean editor", page.evaluate(
+                "() => document.getElementById('dirty-dot').hidden") is True)
+
+            # The rendered preview is snapshotted rather than searched for a
+            # <strong>. welcome.md already contains **Markdown**, so one is
+            # present before the press; the wrapping does not even add another,
+            # because emphasis cannot span the block boundaries of the whole
+            # document. The comparison below is what actually depends on the
+            # edit.
+            before_preview = page.evaluate(
+                "() => document.getElementById('preview-body').innerHTML")
+
             page.click(".cm-content")
             page.keyboard.press("Control+a")
             page.wait_for_timeout(200)
             page.click("#fmt-bold")
-            page.wait_for_timeout(400)
+            # schedule() renders 150ms after the last change; four times that is
+            # slack for a slow first paint, not a race being papered over.
+            page.wait_for_timeout(700)
+
+            # Both ends, not a substring: the note already carried '**' before
+            # the press, so a presence check could not fail.
             check("the bold command wrapped the document", page.evaluate(
-                "() => document.querySelector('.cm-content').textContent.indexOf('**') !== -1"),
-                page.evaluate("() => document.querySelector('.cm-content').textContent.slice(0, 40)"))
-            check("the editor is now marked dirty", page.evaluate(
+                "() => { var t = document.querySelector('.cm-content').textContent;"
+                " return t.slice(0, 2) === '**' && t.slice(-2) === '**'; }"),
+                page.evaluate(
+                    "() => { var t = document.querySelector('.cm-content').textContent;"
+                    " return JSON.stringify([t.slice(0, 2), t.slice(-2)]); }"))
+            # The transition is the evidence that the edit travelled through
+            # CodeMirror's transaction path; a flag left over from earlier
+            # typing is not.
+            check("the edit marked the editor dirty", page.evaluate(
                 "() => document.getElementById('dirty-dot').hidden === false"))
-            check("the preview followed the change", page.evaluate(
-                "() => document.querySelectorAll('#preview-body strong').length > 0"))
+            after_preview = page.evaluate(
+                "() => document.getElementById('preview-body').innerHTML")
+            check("the preview was re-rendered", before_preview != after_preview,
+                  first_difference(before_preview, after_preview))
 
             print("\n5. saving")
             before = len(state["requests"])
