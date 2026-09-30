@@ -203,6 +203,33 @@ export function create(parent, options) {
   return {
     view,
 
+    /**
+     * Apply a change produced by a pure command function.
+     *
+     * Everything that edits the document goes through here, and that is the
+     * point: a change dispatched as a CodeMirror transaction lands in the undo
+     * history, notifies the update listener that drives the dirty flag and the
+     * preview, and cannot leave the view and the state disagreeing. Writing to
+     * the DOM instead would break all three at once.
+     */
+    applyEdit(command) {
+      const main = view.state.selection.main;
+      const result = command({
+        doc: view.state.doc.toString(),
+        from: main.from,
+        to: main.to,
+        selected: view.state.sliceDoc(main.from, main.to)
+      });
+      if (!result || !result.changes) {
+        return;
+      }
+      view.dispatch({
+        changes: result.changes,
+        selection: result.selection || { anchor: main.from }
+      });
+      view.focus();
+    },
+
     getValue() {
       return view.state.doc.toString();
     },

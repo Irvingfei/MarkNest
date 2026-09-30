@@ -36,7 +36,7 @@ const ORDER = [
 // here would fail for reasons that have nothing to do with this application.
 // Its surface is declared instead and checked against the built file below.
 const VENDOR = 'js/vendor.editor.js';
-const VENDOR_SURFACE = ['create', 'render'];
+const VENDOR_SURFACE = ['create', 'render', 'applyEdit'];
 
 /* --------------------------------------------------------------- DOM stub */
 
@@ -335,11 +335,24 @@ if (!fs.existsSync(vendorPath)) {
 } else {
   const bundle = fs.readFileSync(vendorPath, 'utf8');
   for (const member of VENDOR_SURFACE) {
-    // The minifier emits either shape depending on how the literal survives:
-    // `{ render: fn }` or the assignment form `X.render = fn`. Both are
-    // accepted rather than pinning one, because which one appears is a
-    // property of the bundler version and not of the application.
-    if (!new RegExp('[.\\s{;,]' + member + '\\s*[:=]').test(bundle)) {
+    // The minifier emits one of three shapes depending on how the literal
+    // survives: an object-literal property (`{ render: fn }`), an assignment
+    // (`X.render = fn`), or a method in an object literal
+    // (`applyEdit(command) { ... }`). All three are accepted rather than
+    // pinning one, because which one appears is a property of the bundler
+    // version and not of the application.
+    //
+    // The third shape is the only one an *instance* method can take. `create`
+    // and `render` reach the module namespace and so are emitted as
+    // assignments, but `applyEdit` is returned from `create()` and never
+    // leaves the object literal. Requiring the brace after the parameter list
+    // is what keeps this from being satisfied by a mere call site such as
+    // `view.applyEdit(state)`.
+    const exported = new RegExp(
+      '[.\\s{;,]' + member + '\\s*[:=]' +
+      '|[.\\s{;,]' + member + '\\s*\\([^)]*\\)\\s*\\{'
+    );
+    if (!exported.test(bundle)) {
       vendorProblems.push(`${VENDOR} does not appear to export ${member}`);
     }
   }
