@@ -2158,15 +2158,6 @@ node tools/webui_check.js
 | `nav.newNote` | 新建文件 | 新增檔案 | New file |
 | `nav.openNote` | 打开文件 | 開啟檔案 | Open file |
 | `nav.more` | 更多 | 更多 | More |
-| `home.open` | 打开文件 | 開啟檔案 | Open file |
-| `home.new` | 新建文件 | 新增檔案 | New file |
-| `home.recent` | 最近文件 | 最近檔案 | Recent |
-| `home.noRecent` | 还没有笔记 | 還沒有筆記 | No notes yet |
-| `home.timeJustNow` | 刚刚 | 剛剛 | just now |
-| `home.timeMinutes` | {n} 分钟前 | {n} 分鐘前 | {n} min ago |
-| `home.timeHours` | {n} 小时前 | {n} 小時前 | {n} h ago |
-| `home.timeYesterday` | 昨天 | 昨天 | yesterday |
-| `home.timeDays` | {n} 天前 | {n} 天前 | {n} d ago |
 | `picker.title` | 打开文件 | 開啟檔案 | Open a file |
 | `picker.library` | 笔记库 | 筆記庫 | Library |
 | `picker.local` | 本机文件 | 本機檔案 | This computer |
@@ -2175,6 +2166,8 @@ node tools/webui_check.js
 | `picker.readFailed` | 无法读取该文件 | 無法讀取該檔案 | That file could not be read |
 
 > **`format.*` 一组已在 Task 5 加入，本任务不再重复。** 那不是提前偷跑：格式栏的 tooltip 断言要能通过，`I18N.t('format.bold')` 就不能返回键名，所以 Task 5 只能先把那组文案写进三个字典。写进去的是工具栏的 15 条，外加 `format.linkTextPrompt`（无选中时链接按钮先问显示文字），共 16 条，位置在 `webui/js/i18n.js` 每个字典的 `editor.*` 与 `preview.*` 之间。上面这张表因此不再列它——要改那组文案，直接改文件；照着一张重复的表再添一遍，是下一个人对着已有键发愣的来源。
+>
+> **`home.*` 一组已在 Task 7 加入，本任务同样不再重复。** 原因比 `format.*` 更早、也更隐蔽：`webui/index.html` 从 Task 6 起因主页容器带着 `data-i18n="home.open"` 和 `data-i18n="home.new"`，而 `webui_check.js` 只比较三个字典**彼此**是否齐平、从不检查代码引用了什么，所以那两个按钮从 Task 6 起一直在屏幕上显示**键名本身**（`home.open` / `home.new`），没有任何断言失败。Task 7 的 `HomePane` 又需要另外 7 条，于是整组 9 条随它一起写进三个字典，位置在每个字典的 `common.*` 与 `tree.*` 之间。上面这张表因此也不再列 `home.*`——照表再添一遍会与已有键撞名，而撞名不会报错，只会把键悄悄重复一遍。
 
 - [ ] **Step 4: 运行，确认通过**
 

@@ -17,6 +17,7 @@ import json
 import os
 import socketserver
 import threading
+import time
 import urllib.parse
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -41,6 +42,20 @@ NOTES = {
 }
 
 RAW_HTML_NOTE = "# Injection\n\n<script>window.__pwned = true;</script>\n\n<img src=x onerror=\"window.__pwned = true\">\n"
+
+#: How stale each note is, in minutes, for ``/recent``. Ages are offsets from
+#: "now" and are applied at request time rather than frozen into ``NOTES``: a
+#: constant epoch ages with the suite, so an assertion reading "5 分钟前" today
+#: reads "2 小时前" next week, and the failure would have nothing to do with the
+#: code. Keyed by path, so a note keeps its place in the order however the
+#: ``notes`` dictionary is later mutated; a note not named here - one a test
+#: added - is treated as three days old.
+RECENT_AGES = {
+    "welcome.md": 5,
+    "notes/long.md": 90,
+    "notes/plain.txt": 60 * 26,
+}
+RECENT_DEFAULT_AGE = 60 * 24 * 3
 
 
 class StubApi:
@@ -103,6 +118,38 @@ class StubApi:
                              "snippet": body[:120], "engine": "fts5"})
         return {"query": query, "hits": hits, "count": len(hits), "engine": "fts5"}
 
+    def recent(self, raw_limit=None):
+        """The home screen's list, most recently modified first.
+
+        Mirrors ``GET /recent`` in ``usr/local/marknest/lib/api.py``: the same
+        envelope keys, the same default of 12 and ceiling of 50, and the same
+        ordering. The stub exists because the home pane cannot be exercised
+        without it - and because a stub that answered a different shape would
+        let the frontend and the backend drift apart while both suites stayed
+        green.
+        """
+        try:
+            limit = int(raw_limit)
+        except (TypeError, ValueError):
+            limit = 12
+        limit = max(1, min(limit, 50))
+        # One "now" for the whole request, so the entries keep their relative
+        # spacing rather than each being measured against a slightly later
+        # clock.
+        now = time.time_ns()
+        rows = []
+        for path in sorted(self.notes):
+            minutes = RECENT_AGES.get(path, RECENT_DEFAULT_AGE)
+            rows.append({
+                "path": path,
+                "title": path,
+                "mtime_ns": now - minutes * 60 * 10 ** 9,
+                "size": len(self.notes[path].encode("utf-8")),
+            })
+        rows.sort(key=lambda row: row["mtime_ns"], reverse=True)
+        rows = rows[:limit]
+        return {"recent": rows, "count": len(rows), "limit": limit}
+
 
 def _ok(route, payload):
     route.fulfill(status=200, content_type="application/json",
@@ -153,6 +200,8 @@ def make_router(state):
                                "enabled": True, "interval": 30})
         if path.endswith("/search"):
             return _ok(route, api.search((query.get("q") or [""])[0]))
+        if path.endswith("/recent"):
+            return _ok(route, api.recent((query.get("limit") or [None])[0]))
         if path.endswith("/tree"):
             return _ok(route, api.tree((query.get("path") or [""])[0]))
 

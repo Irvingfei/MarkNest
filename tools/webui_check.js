@@ -29,6 +29,7 @@ const ORDER = [
   'js/api.js',
   'js/toshost.js',
   'js/formatbar.js',
+  'js/homepane.js',
   'js/treepane.js',
   'js/editorpane.js',
   'js/previewpane.js',
@@ -200,8 +201,9 @@ for (const rel of ORDER) {
 /* -------------------------------------------------------- collect exports */
 
 const MODULES = {};
-for (const name of ['UI', 'I18N', 'MDCmd', 'FormatBar', 'API', 'TreePane',
-                    'EditorPane', 'PreviewPane', 'SearchPane', 'App', 'TosHost']) {
+for (const name of ['UI', 'I18N', 'MDCmd', 'FormatBar', 'HomePane', 'API',
+                    'TreePane', 'EditorPane', 'PreviewPane', 'SearchPane', 'App',
+                    'TosHost']) {
   const value = sandbox[name];
   if (value && (typeof value === 'object' || typeof value === 'function')) {
     MODULES[name] = new Set(Object.keys(value));
@@ -246,7 +248,7 @@ if (!i18nTables) {
 /* ------------------------------------------------- scan call sites for typos */
 
 const ALLOWED_GLOBALS = new Set([
-  'UI', 'I18N', 'MDCmd', 'FormatBar', 'API', 'TreePane', 'EditorPane',
+  'UI', 'I18N', 'MDCmd', 'FormatBar', 'HomePane', 'API', 'TreePane', 'EditorPane',
   'PreviewPane', 'SearchPane', 'App', 'TosHost', 'MDEditor',
   'window', 'document', 'navigator', 'localStorage', 'console', 'Math', 'JSON',
   'Object', 'Array', 'String', 'Number', 'Boolean', 'Date', 'RegExp', 'Promise',
@@ -304,9 +306,10 @@ const REQUIRED = {
   I18N: ['t', 'errorText', 'apply', 'setLanguage', 'getLanguage', 'detect',
          'supported'],
   API: ['getHealth', 'getOptions', 'getMe', 'getTree', 'getNote', 'saveNote',
-        'createNote', 'renameNote', 'deleteNote', 'search', 'indexStatus',
-        'indexScan'],
+        'createNote', 'renameNote', 'deleteNote', 'getRecent', 'search',
+        'indexStatus', 'indexScan'],
   FormatBar: ['init', 'render', 'setEnabled'],
+  HomePane: ['init', 'reload', 'render'],
   TreePane: ['init', 'reload', 'refresh', 'newNote', 'setCurrent', 'render',
              'current'],
   EditorPane: ['init', 'open', 'save', 'isDirty', 'currentPath', 'editor'],

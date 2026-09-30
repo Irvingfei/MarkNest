@@ -150,6 +150,34 @@ def main():
             page.set_viewport_size({"width": 1280, "height": 800})
             page.wait_for_timeout(400)
 
+            print("\n1e. the home screen lists recent notes")
+            check("both home actions are offered", page.evaluate(
+                "() => !!document.getElementById('home-open') && !!document.getElementById('home-new')"))
+            page.wait_for_timeout(800)
+            recent = page.inner_text("#home-recent")
+            check("the recent list names a note", "welcome.md" in recent, recent[:160])
+            check("it shows a relative time rather than an empty cell",
+                  "分钟前" in recent or "前" in recent, recent[:160])
+
+            # Spec §11 item 3 requires the list to be ordered by modification
+            # time, and requires an entry to open its note. Neither is implied by
+            # finding the name in the text: a list in any order contains it.
+            order = page.evaluate("""() => Array.from(
+                document.querySelectorAll('#home-recent .home-recent-item'))
+                .map(function (node) { return node.textContent; })""")
+            check("the newest note is listed first",
+                  order and "welcome.md" in order[0], order)
+            check("more than one note is listed, so the order means something",
+                  len(order) > 1, order)
+
+            page.click("#home-recent .home-recent-item")
+            page.wait_for_timeout(900)
+            check("clicking a recent note opens it",
+                  "welcome.md" in page.inner_text("#current-path"),
+                  page.inner_text("#current-path"))
+            check("and the application leaves the home screen", page.evaluate(
+                "() => !document.getElementById('workspace').classList.contains('is-home')"))
+
             print("\n2. opening a note")
             # Section 2 is about the click path, so the note that is already
             # open has to be there for the click to be a switch between notes -

@@ -267,6 +267,10 @@
       return request('/notes' + queryString({ path: path }), { method: 'DELETE' });
     },
 
+    getRecent: function (limit) {
+      return request('/recent' + queryString({ limit: limit }));
+    },
+
     search: function (q, limit) {
       return request('/search' + queryString({ q: q, limit: limit }));
     },
