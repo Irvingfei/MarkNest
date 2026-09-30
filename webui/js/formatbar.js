@@ -88,7 +88,9 @@
             id: 'fmt-' + item.id,
             text: item.label,
             'data-i18n-title': item.title,
+            'data-i18n-aria-label': item.title,
             title: item.title,
+            'aria-label': item.title,
             onclick: function () { onPress(item); }
           })
         );
@@ -111,7 +113,10 @@
   function init() {
     hosts.bar = document.getElementById('format-bar');
     render();
-    setEnabled(false);
+    // Re-asserting the current flag rather than forcing false: a re-init after
+    // the bar was enabled would otherwise hide it again while `enabled` still
+    // said it was on, and the next press would act on a bar nobody can see.
+    setEnabled(enabled);
   }
 
   global.FormatBar = { init: init, render: render, setEnabled: setEnabled };

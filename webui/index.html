@@ -49,6 +49,11 @@
     </div>
   </header>
 
+  <!-- role="toolbar" conventionally implies arrow-key navigation between the
+       items, which is not implemented: the buttons are reachable by Tab and
+       carry real accessible names, but there is no roving tabindex. The role
+       is kept because the bar is one, and the gap is recorded here so it reads
+       as a known limitation rather than an oversight. -->
   <div class="format-bar" id="format-bar" role="toolbar" hidden
        data-i18n-aria-label="format.ariaLabel" aria-label="Formatting"></div>
 

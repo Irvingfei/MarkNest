@@ -436,7 +436,9 @@ html, body {
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: 5px 16px;
+  /* The same side padding as the topbar and statusbar, so the first button
+     lines up with the brand icon rather than sitting two pixels inside it. */
+  padding: 5px 20px;
   background: var(--surface-2);
   border-bottom: 1px solid var(--border);
   /* Horizontal scroll rather than wrap: wrapping changes the bar's height and
@@ -636,4 +638,5 @@ html, body {
   }
   .topbar-tail { margin-left: auto; }
   .statusbar { padding-right: calc(14px + var(--statusbar-safe-right)); }
+  .format-bar { padding: 5px 14px; }
 }

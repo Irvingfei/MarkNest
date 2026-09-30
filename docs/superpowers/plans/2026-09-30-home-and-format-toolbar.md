@@ -2173,21 +2173,8 @@ node tools/webui_check.js
 | `picker.browse` | 选择本机文件… | 選擇本機檔案… | Choose a file… |
 | `picker.localHint` | 选择本机文件后将导入到笔记库，成为一篇普通笔记。 | 選擇本機檔案後將匯入筆記庫，成為一篇普通筆記。 | A file chosen here is imported into your library, where it becomes an ordinary note. |
 | `picker.readFailed` | 无法读取该文件 | 無法讀取該檔案 | That file could not be read |
-| `format.ariaLabel` | 格式工具栏 | 格式工具列 | Formatting |
-| `format.bold` | 加粗 | 粗體 | Bold |
-| `format.italic` | 斜体 | 斜體 | Italic |
-| `format.code` | 行内代码 | 行內程式碼 | Inline code |
-| `format.codeblock` | 代码块 | 程式碼區塊 | Code block |
-| `format.quote` | 引用 | 引用 | Quote |
-| `format.h1` | 一级标题 | 一級標題 | Heading 1 |
-| `format.h2` | 二级标题 | 二級標題 | Heading 2 |
-| `format.h3` | 三级标题 | 三級標題 | Heading 3 |
-| `format.task` | 任务 | 待辦 | Task |
-| `format.bullet` | 无序列表 | 無序清單 | Bullet list |
-| `format.numbered` | 有序列表 | 有序清單 | Numbered list |
-| `format.link` | 链接 | 連結 | Link |
-| `format.table` | 表格 | 表格 | Table |
-| `format.linkPrompt` | 链接地址 | 連結位址 | Link address |
+
+> **`format.*` 一组已在 Task 5 加入，本任务不再重复。** 那不是提前偷跑：格式栏的 tooltip 断言要能通过，`I18N.t('format.bold')` 就不能返回键名，所以 Task 5 只能先把那组文案写进三个字典。写进去的是工具栏的 15 条，外加 `format.linkTextPrompt`（无选中时链接按钮先问显示文字），共 16 条，位置在 `webui/js/i18n.js` 每个字典的 `editor.*` 与 `preview.*` 之间。上面这张表因此不再列它——要改那组文案，直接改文件；照着一张重复的表再添一遍，是下一个人对着已有键发愣的来源。
 
 - [ ] **Step 4: 运行，确认通过**
 

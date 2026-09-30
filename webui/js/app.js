@@ -156,7 +156,7 @@
       // Task 6 replaces this with the view state machine, which is what will
       // decide where the bar belongs; until it exists, opening a note is the
       // only signal there is.
-      global.FormatBar.setEnabled(true);
+      global.FormatBar.setEnabled(!!path);
     }
     if (push) {
       writeHash(path);
