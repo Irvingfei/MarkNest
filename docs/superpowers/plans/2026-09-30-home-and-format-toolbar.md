@@ -805,7 +805,7 @@ git commit -m "feat(editor): pure markdown commands, asserted without a browser"
 
 - [ ] **Step 1: 写失败的断言**
 
-在 `tools/webui_check.js` 的 `ORDER` 里 `js/mdcmd.js` 之后加 `'js/formatbar.js'`；`MODULES`/`ALLOWED_GLOBALS` 加 `'FormatBar'`；`REQUIRED` 加：
+在 `tools/webui_check.js` 的 `ORDER` 里加 `'js/formatbar.js'`，位置在 `toshost` 之后——也就是页面加载顺序里 `vendor.editor.js` 占的那一格，因为 vendored 产物按约定不进 `ORDER`，`ORDER` 就是「页面顺序去掉它」。同一步再加一条此前没人执行的检查：把 `ORDER` 与 `webui/index.html` 里的 `<script src>` 列表逐项比对（剥掉 `?v=`、丢掉 vendored 产物），第一个不一致的位置和名字直接报出来。「两个顺序必须逐项一致」自此由套件保证，而不是两份文件各自记着。`MODULES`/`ALLOWED_GLOBALS` 加 `'FormatBar'`；`REQUIRED` 加：
 
 ```js
   FormatBar: ['init', 'render', 'setEnabled'],
