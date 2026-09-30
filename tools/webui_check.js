@@ -345,12 +345,15 @@ if (!fs.existsSync(vendorPath)) {
     // The third shape is the only one an *instance* method can take. `create`
     // and `render` reach the module namespace and so are emitted as
     // assignments, but `applyEdit` is returned from `create()` and never
-    // leaves the object literal. Requiring the brace after the parameter list
-    // is what keeps this from being satisfied by a mere call site such as
-    // `view.applyEdit(state)`.
+    // leaves the object literal. Its leading character is pinned to `{` or
+    // `,` - the two that can precede an object-literal method in the emitted
+    // bundle - because a `\s` there would also admit a call site followed by
+    // a block, a standalone function declaration, or a comment. The brace
+    // after the parameter list is required for the same reason: a bare call
+    // must not satisfy the check.
     const exported = new RegExp(
       '[.\\s{;,]' + member + '\\s*[:=]' +
-      '|[.\\s{;,]' + member + '\\s*\\([^)]*\\)\\s*\\{'
+      '|[{,]' + member + '\\s*\\([^)]*\\)\\s*\\{'
     );
     if (!exported.test(bundle)) {
       vendorProblems.push(`${VENDOR} does not appear to export ${member}`);
