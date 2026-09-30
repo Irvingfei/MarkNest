@@ -98,11 +98,25 @@
       return;
     }
     var width = workspace.clientWidth;
+    // A workspace that is not laid out - the home screen is displayed instead -
+    // reports a width of 0, and recording that as "collapse every pane" leaves
+    // the tree and the preview gone once the workspace comes back. Reading an
+    // ancestor's width instead would be a second notion of width that can
+    // drift from the workspace's own box and its splitters, so the measurement
+    // is refused rather than approximated; setView() re-measures on the way
+    // back, which is when the width is real again.
+    if (!width) {
+      return;
+    }
     // Collapse progressively rather than squeezing three panes into a frame
-    // that cannot hold them. Below 900px the preview goes; below 640px the
-    // tree goes with it.
+    // that cannot hold them. Below 900px the preview goes; at 640px and below
+    // the tree goes with it.
     workspace.classList.toggle('is-no-preview', width < 900 || !options.preview);
-    workspace.classList.toggle('is-no-tree', width < 640);
+    // Inclusive, to match the media query that stacks the home screen's
+    // buttons at the same width: a media query cannot say "strictly less than"
+    // without an off-by-one number, so the comparison is what moved. One
+    // number, 640, then means the same thing in both files.
+    workspace.classList.toggle('is-no-tree', width <= 640);
   }
 
   function togglePreview() {
@@ -294,6 +308,24 @@
   function boot() {
     options.preview = true;
 
+    // The view is decided here, synchronously, rather than in step('tree-load')
+    // where the route is otherwise read: that step cannot run until the tree
+    // request answers, and until it does the three-pane workspace with an empty
+    // editor is what is on screen - the exact screen this state machine exists
+    // to replace, for as long as the request takes, which on a real NAS is
+    // seconds. Nothing here awaits.
+    //
+    // A fragment the application does not own, such as '#/nonsense', takes the
+    // same no-note path as an empty one, so the fragment always ends up naming
+    // the view that is actually on screen.
+    var initial = pageFromHash();
+    if (initial.params.p) {
+      setView('note');
+    } else {
+      setView('home');
+      writeHash('');
+    }
+
     step('language', function () {
       I18N.setLanguage(I18N.getLanguage());
     });
@@ -322,9 +354,10 @@
     });
 
     step('home', function () {
-      // HomePane does not exist yet; the guard is the same pattern the
-      // neighbouring steps use, and it keeps this step from being the one that
-      // aborts the rest of startup.
+      // Guarded, unlike the steps around it, because HomePane genuinely does
+      // not exist yet - the module arrives in a later task. The neighbours call
+      // their modules unguarded on purpose: there a missing global is a real
+      // failure and should be loud rather than skipped.
       if (global.HomePane) {
         global.HomePane.init({ onOpen: openNote });
       }
@@ -357,11 +390,11 @@
         if (route.params.p) {
           openNote(route.params.p, false);
         } else {
-          // The spec's fragment is the only thing that survives a reload of
-          // the iframe, so it has to name the view that is actually on screen
-          // - an empty hash and a home screen disagree about where the user is.
+          // The view and the fragment were already put in order at the top of
+          // boot(); what is left for this step is loading the home screen's own
+          // content now that the tree is in - the same reason the note is
+          // opened here rather than earlier.
           showHome(false);
-          writeHash('');
         }
       });
     });

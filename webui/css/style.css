@@ -695,13 +695,18 @@ html, body {
   .format-bar { padding: 5px 14px; }
 }
 
-/* A breakpoint of its own rather than a clause in the block above: 900px is
-   where the host's chrome starts wrapping, while 640px is already the width at
-   which app.js drops the tree pane - so 640 keeps meaning one thing. */
+/* A breakpoint of its own rather than a clause in the block above. 900px is
+   where the host's chrome starts wrapping; 640 is already the width at which
+   app.js drops the tree pane, so 640 keeps meaning one thing across the two
+   files - and that is the whole reason for the number, not a measurement of
+   the two buttons. The bound is inclusive here and was made inclusive there
+   for the same reason: a media query cannot express "strictly less than"
+   without an off-by-one number, and writing 639px would make the two files
+   disagree about the number rather than about the layout. */
 @media (max-width: 640px) {
-  /* Stacked rather than side by side: two 148px buttons plus the frame's
-     padding stop fitting before this width, and wrapping them while keeping
-     them inline-sized reads as a mistake rather than a layout. */
+  /* Stacked rather than side by side: at this width the frame has already
+     given up the tree, and two buttons still sharing a row read as the thing
+     that should have moved. */
   .home-actions { flex-direction: column; align-self: stretch; }
   .home-btn { width: 100%; }
 }
