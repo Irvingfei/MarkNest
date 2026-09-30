@@ -1201,15 +1201,56 @@ python tools/verify_editor.py
 
 同时把 `pageFromHash` 里 `raw || 'notes'` 改成 `raw || 'home'`。
 
-- [ ] **Step 4: 运行，确认通过**
+- [ ] **Step 4: 让既有测试能走到笔记视图**
+
+**这一步不能省。** Task 6 让应用从主页启动，而 `.workspace.is-home { display: none }` 会把整块工作区（含目录树）藏起来。`tools/verify_editor.py` 从第 2 节起就假设三栏可见——第 78 行的 `click_note(page, "welcome.md")` 会点在一个隐藏元素上，**后续每一节都会失败**。
+
+在 `tools/verify_editor.py` 顶部（`click_note` 附近）加一个辅助：
+
+```python
+def open_note_directly(page, path):
+    """Put the application into the note view for a path, without the UI.
+
+    The sections after the first are about the editor, the preview and the
+    toolbar - not about how a note is reached. Driving them through the home
+    screen would make every one of them depend on the file picker, which does
+    not exist yet at this point in the plan. The path in the hash is the
+    application's own supported way to address a note, so this is the honest
+    shortcut rather than a workaround.
+    """
+    page.evaluate(
+        "(p) => { location.hash = '#/notes?p=' + encodeURIComponent(p); }", path)
+    page.wait_for_timeout(900)
+```
+
+然后在第 2 节（`2. opening a note`）的 `click_note(page, "welcome.md")` **之前**加一行：
+
+```python
+            # Enter the note view first; the home screen hides the tree.
+            open_note_directly(page, "welcome.md")
+```
+
+第 2 节随后照旧点树里的行——它验的是**点击这条路**，先有笔记打开并不影响这一点，反而正是「已有一篇打开时切到另一篇」的真实场景。
+
+第 8 节（`scroll synchronisation`）在 `page.reload()` 之后同样需要先进入笔记视图：
+
+```python
+            page.reload(wait_until="load")
+            page.wait_for_timeout(1200)
+            open_note_directly(page, "notes/long.md")
+```
+
+（原来那里是先展开 `notes` 文件夹再点 `long.md`；`open_note_directly` 直接按路径进入，两行展开点击可以去掉。）
+
+- [ ] **Step 5: 运行，确认通过**
 
 ```bash
 python tools/verify_editor.py
 ```
 
-预期：`1c` 三条 PASS；但后续 `opening a note` 一节会 FAIL，因为 `HomePane` 还不存在——这正是下一任务要做的。
+预期：`1c` 三条 PASS；第 2 节及其后各节全部 PASS。（`HomePane` 尚不存在，所以主页本身还没有内容——那只影响 Task 7 要加的那几条断言，不影响既有各节。）
 
-- [ ] **Step 5: 提交**
+- [ ] **Step 6: 提交**
 
 ```bash
 git add webui/js/app.js webui/index.html webui/css/style.css tools/verify_editor.py
@@ -2099,21 +2140,36 @@ git commit -m "feat(i18n): strings for the home screen, the menu and the format 
 
 `measure_topbar.py` 的 `SCAN_JS` 选择器已经覆盖 `button` 与 `[tabindex]`，因此新按钮**自动**进入扫描。需要新增的是**主页与格式工具栏都要被扫到**——当前脚本只在 `note` 态扫一次。
 
-把 `main()` 里扫描循环之前的一段改成扫两个状态：
+把 `main()` 里扫描循环之前的一段改成扫两个状态。
+
+同时**删掉循环之前那三行**——原本为了让编辑器、预览和它们的页脚都有内容而先点开一篇笔记：
+
+```python
+            # Open a note so the editor, the preview and their footers are all
+            # populated; an empty layout is not the layout.
+            page.click('.tree-row:has(.tree-name:text-is("welcome.md"))')
+            page.wait_for_timeout(700)
+```
+
+循环自己会在 `note` 轮次里进入笔记视图，这三行既多余、又会在主页上点到隐藏元素。
 
 ```python
             # Both states get scanned: the home screen has its own buttons and
             # the format bar only exists once a note is open, so a scan of one
             # state says nothing about the other.
+            #
+            # The note state is entered through the hash rather than by clicking
+            # a tree row: on the home screen the workspace - and the tree inside
+            # it - is hidden, so that click would land on an invisible element.
             print("Scanning %d widths in both the home and note states" % len(WIDTHS))
             print("-" * 62)
             for state_name in ("home", "note"):
                 if state_name == "note":
-                    page.click('.tree-row:has(.tree-name:text-is("welcome.md"))')
-                    page.wait_for_timeout(700)
+                    page.evaluate(
+                        "() => { location.hash = '#/notes?p=' + encodeURIComponent('welcome.md'); }")
                 else:
                     page.evaluate("() => { location.hash = '#/home'; }")
-                    page.wait_for_timeout(700)
+                page.wait_for_timeout(900)
 
                 for width in WIDTHS:
                     page.set_viewport_size({"width": width, "height": 720})
