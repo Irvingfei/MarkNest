@@ -221,6 +221,21 @@ class Api:
             "engine": "fts5" if store.fts else "scan",
         }
 
+    # ----------------------------------------------------------------- recent
+
+    def get_recent(self, request):
+        """The notes the home screen lists, most recently modified first.
+
+        Deliberately not paginated: this is a starting point, not a browser.
+        The ceiling exists so a client cannot ask for the whole library and
+        make the socket proxy carry it.
+        """
+        limit = _as_int(request.param("limit"), "limit", default=12, minimum=1)
+        limit = min(limit, 50)
+        indexer.maybe_scan(request.user)
+        rows = store.recent(request.user, limit)
+        return {"recent": rows, "count": len(rows), "limit": limit}
+
     # ------------------------------------------------------------------ index
 
     def get_index_status(self, request):
@@ -261,6 +276,8 @@ class Api:
                 return 200, self.get_note(request)
             if path == "/search":
                 return 200, self.get_search(request)
+            if path == "/recent":
+                return 200, self.get_recent(request)
             if path == "/index/status":
                 return 200, self.get_index_status(request)
             raise NotFound("no such endpoint: %s" % path)

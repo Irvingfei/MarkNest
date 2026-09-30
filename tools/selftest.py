@@ -2,16 +2,21 @@
 """Backend self test for MarkNest.
 
 Runs entirely offline against a temporary library, with no TOS device and no
-system accounts involved. The HTTP transport is covered by the browser harnesses;
-what is pinned here is the logic that is easy to get subtly wrong and impossible
-to eyeball - containment, the two independent capability bits, atomic writes,
-conflict detection, and the search fallback.
+system accounts involved. The HTTP transport - the socket, keep-alive framing
+and multipart decoding - is covered by the browser harnesses against a real
+server; request routing, the response envelope and parameter handling are
+asserted here through the dispatcher. What is pinned here is the logic that is
+easy to get subtly wrong and impossible to eyeball - containment, the two
+independent capability bits, atomic writes, conflict detection, the search
+fallback and the parameter clamps.
 
 Usage:
     python tools/selftest.py
 Exit code 0 means every check passed.
 """
 
+import io
+import json
 import os
 import shutil
 import sys
@@ -71,19 +76,51 @@ def raises(label, exception, fn, *args, **kwargs):
 # --------------------------------------------------------------------- imports
 
 from lib import db, index, library  # noqa: E402
+from lib.api import api  # noqa: E402
 from lib.config import config  # noqa: E402
 from lib.errors import (  # noqa: E402
     ConflictDetected,
     LibraryNotWritable,
+    MarkNestError,
     NameInvalid,
     NoteExists,
     NoteNotFound,
     NoteTooLarge,
     PathInvalid,
 )
+from lib.http_util import Headers, Request, wrap_success  # noqa: E402
 
 USER = "alice"
 OTHER = "bob"
+
+
+def request(method, path, body=None, headers=None, user=USER):
+    """Dispatch one request in-process and return ``(status, envelope)``.
+
+    This is not the HTTP transport: the socket, keep-alive framing and multipart
+    decoding are exercised by the browser harnesses against a real server. What
+    this does exercise is everything between the request line and the response
+    body - path normalisation, the route table, identity resolution, the
+    response envelope and the error mapping. Those are pure logic, they are
+    where a missing route or a missing clamp goes wrong silently, and a browser
+    test that only looks at the screen would not notice either.
+    """
+    merged = {"Cookie": "tos_current_username=%s;" % user}
+    merged.update(headers or {})
+    raw = json.dumps(body).encode("utf-8") if body is not None else b""
+    hdrs = Headers(merged)
+    if body is not None:
+        hdrs.add("Content-Type", "application/json")
+        hdrs.add("Content-Length", str(len(raw)))
+    try:
+        status, payload = api.dispatch(
+            Request(method, path, "HTTP/1.1", hdrs, io.BytesIO(raw))
+        )
+    except MarkNestError as exc:
+        return exc.status, exc.to_payload()
+    if status == 204 or payload is None:
+        return status, None
+    return status, wrap_success(payload)
 
 
 def test_containment():
@@ -360,6 +397,22 @@ def test_recent():
     check("rows carry what the home screen shows",
           all(set(("path", "title", "mtime_ns", "size")) <= set(row) for row in rows), rows[:1])
     check("the limit is honoured", len(db.store.recent(USER, 1)) == 1)
+
+    # The endpoint, through the dispatcher, so the route and the envelope are
+    # exercised rather than just the query.
+    status, payload = request("GET", "/v2/proxy/marknest/recent?limit=2")
+    data = payload.get("data") or {}
+    check("GET /recent answers", status == 200 and payload.get("code") == 0, payload)
+    check("it returns at most the requested number",
+          len(data.get("recent") or []) <= 2, data)
+    check("the entries carry a path and a time",
+          all("path" in item and "mtime_ns" in item for item in data.get("recent") or []),
+          data.get("recent"))
+
+    status, payload = request("GET", "/v2/proxy/marknest/recent?limit=9999")
+    check("an absurd limit is clamped rather than refused", status == 200, payload)
+    check("and clamped to the documented ceiling",
+          len((payload.get("data") or {}).get("recent") or []) <= 50, payload)
 
 
 def test_identity_validation():
