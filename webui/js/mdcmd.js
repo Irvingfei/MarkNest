@@ -11,7 +11,9 @@
  *
  *   command({doc, from, to, selected}) -> {changes: {from, to, insert}, selection}
  *
- * Offsets are absolute positions in `doc`.
+ * Offsets are absolute positions in `doc`. Every command takes that one context
+ * object and nothing else, with a single exception: link also needs the URL,
+ * and the optional display text, as `link(ctx, url, label)`.
  */
 
 (function (global) {
@@ -65,16 +67,19 @@
 
   function codeblock(ctx) {
     var fence = '```\n\n```';
+    // A fenced block has to sit on its own lines; joining the surrounding text
+    // to the fence would silently change the paragraph it belongs to. The
+    // no-selection branch needs the guard as much as the selection branch: with
+    // the fence glued to the text before it, the opening fence is inline text
+    // and the closing one opens a block that swallows the rest of the note.
+    var lead = ctx.from > 0 && ctx.doc[ctx.from - 1] !== '\n' ? '\n' : '';
     if (ctx.selected) {
       var body = ctx.selected;
-      // A fenced block has to sit on its own lines; joining the surrounding
-      // text to the fence would silently change the paragraph it belongs to.
-      var lead = ctx.from > 0 && ctx.doc[ctx.from - 1] !== '\n' ? '\n' : '';
       var tail = ctx.to < ctx.doc.length && ctx.doc[ctx.to] !== '\n' ? '\n' : '';
       return replace(ctx.from, ctx.to, lead + '```\n' + body + '\n```' + tail,
         { anchor: ctx.from + lead.length + 4, head: ctx.from + lead.length + 4 + body.length });
     }
-    return replace(ctx.from, ctx.to, fence, { anchor: ctx.from + 4 });
+    return replace(ctx.from, ctx.to, lead + fence, { anchor: ctx.from + lead.length + 4 });
   }
 
   /* -------------------------------------------------------------- block */
@@ -121,11 +126,6 @@
     return marked;
   }
 
-  /* An all-blank block is where a construct gets started: the cursor is on the
-     empty line and the button is meant to put the marker there. A blank line
-     *inside* a block is a different thing - a marker on it is a dangling item
-     or trailing whitespace - so the two cases are told apart rather than
-     lumped together. */
   function allBlank(lines) {
     for (var i = 0; i < lines.length; i += 1) {
       if (!isBlank(lines[i])) {
@@ -133,6 +133,16 @@
       }
     }
     return true;
+  }
+
+  /* Whether a blank line takes the marker anyway. An all-blank block is where a
+     construct gets started - the cursor is on the empty line and the button is
+     meant to put the marker there - so its first line takes it. A blank line
+     *inside* a block is a different thing: a marker on it is a dangling item or
+     trailing whitespace, so it keeps clear. Both the line commands and the
+     headings ask this, which is why it has one home. */
+  function marksBlank(index, empty) {
+    return index === 0 && empty;
   }
 
   /* Where the two endpoints land after the edit.
@@ -196,7 +206,7 @@
       if (!isBlank(line)) {
         return prefix ? line : apply(line);
       }
-      return index === 0 && empty ? apply(line) : line;
+      return marksBlank(index, empty) ? apply(line) : line;
     }).join('\n');
     return blockResult(range, ctx, text);
   }
@@ -220,7 +230,7 @@
         var bare = line.replace(HEADING, '');
         return removing ? bare : hashes + bare;
       }
-      return index === 0 && empty ? hashes + line : line;
+      return marksBlank(index, empty) ? hashes + line : line;
     }).join('\n');
     return blockResult(range, ctx, text);
   }
@@ -262,9 +272,13 @@
   function table(ctx) {
     var skeleton = '|  |  |  |\n| --- | --- | --- |\n|  |  |  |';
     var lead = ctx.from > 0 && ctx.doc[ctx.from - 1] !== '\n' ? '\n' : '';
+    // Without the trailing newline, a caret mid-word glues whatever follows it
+    // onto the table's last row.
+    var tail = ctx.to < ctx.doc.length && ctx.doc[ctx.to] !== '\n' ? '\n' : '';
     // The cursor lands in the first header cell so the next keystroke types a
     // column name rather than having to be preceded by navigating there.
-    return replace(ctx.from, ctx.to, lead + skeleton, { anchor: ctx.from + lead.length + 2 });
+    return replace(ctx.from, ctx.to, lead + skeleton + tail,
+      { anchor: ctx.from + lead.length + 2 });
   }
 
   global.MDCmd = {

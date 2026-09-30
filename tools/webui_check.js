@@ -394,6 +394,18 @@ if (!CMD) {
     // The other direction, so the blank-line rule cannot quietly disappear.
     ['a blank line inside the block is left alone', 'bullet',
       { doc: 'a\n\nb', from: 0, to: 4, selected: 'a\n\nb' }, '- a\n\n- b'],
+    // The heading transform has its own copy of the all-blank rule, so an
+    // assertion on quote alone would not notice if this one were dropped.
+    ['a heading starts on an empty line', 'h1',
+      { doc: '', from: 0, to: 0, selected: '' }, '# '],
+    // A fenced block has to start on its own line, or the opening fence is
+    // inline text and the closing one opens a block that swallows the note.
+    ['a code block starts on its own line', 'codeblock',
+      { doc: 'abc', from: 3, to: 3, selected: '' }, '\n```\n\n```'],
+    // The checked marker is a distinct prefix: without it a checked item is not
+    // recognised as a task at all, and comes back as '- [ ] - [x] done'.
+    ['a task item removes a checked marker', 'task',
+      { doc: '- [x] done', from: 0, to: 10, selected: '' }, 'done', '[x]'],
     // bullet must recognise a task item as an unordered item and remove the
     // whole marker. A substring check alone cannot see this: 'buy milk' IS a
     // substring of the broken '[ ] buy milk', so the case needs a forbidden
@@ -416,6 +428,13 @@ if (!CMD) {
   // Toggle-off: applying the same command twice must return the document to
   // where it started. This is the rule that is easiest to implement for half
   // the buttons and forget for the other half.
+  //
+  // Ten of the thirteen commands are covered here. codeblock, link and table
+  // are insert-only by design rather than by omission: the design spec's rows
+  // for those three describe what they insert and never say the marker is
+  // cancelled when it is already there, unlike the rows for quote, the headings
+  // and the three list commands. Fence or link detection must not be added to
+  // close that gap.
   for (const name of ['bold', 'italic', 'code', 'quote', 'h1', 'h2', 'h3', 'task', 'bullet', 'numbered']) {
     const fn = CMD.commands && CMD.commands[name];
     if (typeof fn !== 'function') { continue; }
@@ -642,7 +661,7 @@ if (!i18nProblems.length) { console.log('  ok   every dictionary defines the sam
 console.log('');
 console.log('markdown commands:');
 for (const item of cmdProblems) { console.log('  [ERROR] ' + item); }
-if (!cmdProblems.length) { console.log('  ok   every command produces the expected markdown, and toggles off'); }
+if (!cmdProblems.length) { console.log('  ok   every command produces the expected markdown; the ten toggleable ones toggle off'); }
 
 console.log('');
 console.log('editor bundle:');
