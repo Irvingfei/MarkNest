@@ -412,7 +412,7 @@ def test_recent():
     status, payload = request("GET", "/v2/proxy/marknest/recent?limit=9999")
     check("an absurd limit is clamped rather than refused", status == 200, payload)
     check("and clamped to the documented ceiling",
-          len((payload.get("data") or {}).get("recent") or []) <= 50, payload)
+          (payload.get("data") or {}).get("limit") == 50, payload)
 
 
 def test_identity_validation():
