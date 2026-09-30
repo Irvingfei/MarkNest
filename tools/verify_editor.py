@@ -466,6 +466,77 @@ def main():
             body = page.inner_text("#tree-body")
             check("a search lists matching notes", "long.md" in body, body[:120])
 
+            print("\n9b. the tree's context menu runs the item it is given")
+            # The menu is detached from the document by the mousedown that
+            # precedes the click. A detached mousedown target and a mouseup
+            # target outside it share no inclusive ancestor, so the browser
+            # dispatches no click event at all and the item's handler never
+            # runs: 重命名 and 删除 did nothing on a real click, while a
+            # synthetic click on the same button worked.
+            #
+            # What is asserted is therefore that the handler was entered, not
+            # that the tree changed. A cancelled rename leaves the tree exactly
+            # as it was, so the tree cannot tell "ran, and the answer was
+            # empty" from "never ran" - which is the mistake this assertion
+            # exists to avoid making.
+            #
+            # The search box is emptied first: a search renders .hit rows
+            # rather than .tree-row ones, and the tree row is what carries the
+            # contextmenu handler.
+            page.fill("#search-box", "")
+            page.wait_for_timeout(700)
+            menu_row = '.tree-row:has(.tree-name:text-is("long.md"))'
+            # Counted through the same selector engine click_note uses:
+            # :has() and :text-is() are Playwright's, not the DOM's, and
+            # document.querySelector rejects them.
+            has_row = page.locator(menu_row).count() > 0
+            if has_row:
+                page.click(menu_row, button="right")
+                page.wait_for_timeout(300)
+            first_open = has_row and page.evaluate(
+                "() => !!document.getElementById('tree-menu')")
+            check("right-clicking a tree row opens the context menu", first_open)
+
+            if first_open:
+                # The prompts are replaced rather than answered through a
+                # dialog listener: treepane calls window.prompt and
+                # window.confirm directly, the recorder is what proves the
+                # handler was entered, and nothing is left registered for
+                # section 11's link prompt to trip over. Cancelling both is
+                # also what keeps this section from renaming or deleting
+                # anything.
+                page.evaluate("""() => {
+                    window.__realPrompt = window.prompt;
+                    window.__realConfirm = window.confirm;
+                    window.__asked = { rename: 0, remove: 0 };
+                    window.prompt = () => { window.__asked.rename += 1; return null; };
+                    window.confirm = () => { window.__asked.remove += 1; return false; };
+                }""")
+                page.click("#tree-menu .ctx-item")
+                page.wait_for_timeout(400)
+                check("a real click on 重命名 reaches its handler",
+                      page.evaluate("() => window.__asked.rename") == 1,
+                      page.evaluate("() => window.__asked"))
+                check("and choosing it closed the menu", page.evaluate(
+                    "() => !document.getElementById('tree-menu')"))
+
+                if has_row:
+                    page.click(menu_row, button="right")
+                    page.wait_for_timeout(300)
+                second_open = has_row and page.evaluate(
+                    "() => !!document.getElementById('tree-menu')")
+                if second_open:
+                    page.click("#tree-menu .ctx-item.is-danger")
+                    page.wait_for_timeout(400)
+                check("a real click on 删除 reaches its handler",
+                      second_open and page.evaluate(
+                          "() => window.__asked.remove") == 1,
+                      page.evaluate("() => window.__asked"))
+                page.evaluate("""() => {
+                    window.prompt = window.__realPrompt;
+                    window.confirm = window.__realConfirm;
+                }""")
+
             print("\n10. the three host bands stay clear and the layout adapts")
             page.fill("#search-box", "")
             page.wait_for_timeout(400)

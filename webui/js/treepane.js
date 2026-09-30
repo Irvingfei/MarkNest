@@ -234,12 +234,30 @@
   /* A right-click menu rather than a button on every row: a note library is
      mostly read, and a permanent delete affordance beside every note is a
      hazard with no upside. The menu is positioned at the pointer and closes on
-     the next click anywhere. */
+     a press anywhere else, on one of its own items being chosen, or on a later
+     right-click replacing it. */
   function closeMenu() {
     var existing = document.getElementById('tree-menu');
     if (existing && existing.parentNode) {
       existing.parentNode.removeChild(existing);
     }
+    document.removeEventListener('mousedown', onOutside);
+  }
+
+  /* A press outside the menu closes it; a press inside it must not.
+     This is the whole reason the guard exists: detaching the menu on mousedown
+     leaves the pressed element with no inclusive ancestor in common with
+     whatever the mouseup lands on, so the browser dispatches no click event at
+     all - the item's own handler never ran, and 重命名 and 删除 did nothing
+     when a person clicked them, while a synthetic click on the same button
+     worked. The items close the menu themselves, so the press that activates
+     one is not an outside press. */
+  function onOutside(event) {
+    var menu = document.getElementById('tree-menu');
+    if (menu && event.target && menu.contains(event.target)) {
+      return;
+    }
+    closeMenu();
   }
 
   function menu(entry, event) {
@@ -267,8 +285,15 @@
     node.style.left = Math.max(4, event.clientX) + 'px';
     node.style.top = Math.max(4, event.clientY) + 'px';
     document.body.appendChild(node);
+    // Registered on the next tick so the right-click that opened the menu does
+    // not immediately close it. Deliberately not { once: true }: that flag is
+    // spent by the first press whether or not it closes anything, so a press
+    // inside the menu that produced no click at all - pressed on an item,
+    // released off it - would leave the menu open with nothing left listening
+    // for the press that ought to close it. closeMenu() removes it instead,
+    // which is what makes the pair symmetric.
     global.setTimeout(function () {
-      document.addEventListener('mousedown', closeMenu, { once: true });
+      document.addEventListener('mousedown', onOutside);
     }, 0);
   }
 
