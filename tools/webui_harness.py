@@ -41,6 +41,14 @@ NOTES = {
     "notes/plain.txt": "just text\n",
 }
 
+#: What the backend opens as a note, mirroring the default of
+#: ``MARKNEST_NOTE_EXTENSIONS`` in ``usr/local/marknest/lib/config.py``. ``.txt``
+#: belongs in this list: the backend accepts it on every write and the picker's
+#: accept list already offers it, so a stub that left it out hid a real note
+#: from the picker's library tab and left one of the four accepted types with no
+#: test that ever saw it.
+NOTE_EXTENSIONS = (".md", ".markdown", ".mdown", ".txt")
+
 RAW_HTML_NOTE = "# Injection\n\n<script>window.__pwned = true;</script>\n\n<img src=x onerror=\"window.__pwned = true\">\n"
 
 #: How stale each note is, in minutes, for ``/recent``. Ages are offsets from
@@ -91,11 +99,12 @@ class StubApi:
                 entries.append({"name": top, "path": prefix + top, "type": "dir",
                                 "note": False, "size": 0, "mtime_ns": 0})
             else:
+                is_note = rest.lower().endswith(NOTE_EXTENSIONS)
                 entries.append({
                     "name": rest,
                     "path": full,
-                    "type": "note" if rest.endswith((".md", ".markdown", ".mdown")) else "other",
-                    "note": rest.endswith((".md", ".markdown", ".mdown")),
+                    "type": "note" if is_note else "other",
+                    "note": is_note,
                     "size": len(self.notes[full].encode("utf-8")),
                     "mtime_ns": 0,
                 })
