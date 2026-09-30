@@ -21,6 +21,7 @@ const WEBUI = path.join(REPO_ROOT, 'webui');
 const ORDER = [
   'js/i18n.js',
   'js/ui.js',
+  'js/mdcmd.js',
   'js/api.js',
   'js/toshost.js',
   'js/treepane.js',
@@ -194,8 +195,8 @@ for (const rel of ORDER) {
 /* -------------------------------------------------------- collect exports */
 
 const MODULES = {};
-for (const name of ['UI', 'I18N', 'API', 'TreePane', 'EditorPane', 'PreviewPane',
-                    'SearchPane', 'App', 'TosHost']) {
+for (const name of ['UI', 'I18N', 'MDCmd', 'API', 'TreePane', 'EditorPane',
+                    'PreviewPane', 'SearchPane', 'App', 'TosHost']) {
   const value = sandbox[name];
   if (value && (typeof value === 'object' || typeof value === 'function')) {
     MODULES[name] = new Set(Object.keys(value));
@@ -240,8 +241,8 @@ if (!i18nTables) {
 /* ------------------------------------------------- scan call sites for typos */
 
 const ALLOWED_GLOBALS = new Set([
-  'UI', 'I18N', 'API', 'TreePane', 'EditorPane', 'PreviewPane', 'SearchPane',
-  'App', 'TosHost', 'MDEditor',
+  'UI', 'I18N', 'MDCmd', 'API', 'TreePane', 'EditorPane', 'PreviewPane',
+  'SearchPane', 'App', 'TosHost', 'MDEditor',
   'window', 'document', 'navigator', 'localStorage', 'console', 'Math', 'JSON',
   'Object', 'Array', 'String', 'Number', 'Boolean', 'Date', 'RegExp', 'Promise',
   'Error', 'TypeError', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval',
@@ -318,6 +319,71 @@ for (const [moduleName, members] of Object.entries(REQUIRED)) {
   for (const member of members) {
     if (!MODULES[moduleName].has(member)) {
       missingRequired.push(`${moduleName}.${member} missing`);
+    }
+  }
+}
+
+/* ------------------------------------------------- markdown command audit */
+
+/* The commands are pure functions, so their output can be asserted here rather
+ * than in a browser - which matters because the fiddly parts (toggle-off,
+ * where the cursor lands with no selection) are exactly the parts a browser
+ * test would exercise only by accident. */
+const cmdProblems = [];
+const CMD = sandbox.MDCmd;
+if (!CMD) {
+  cmdProblems.push('MDCmd is not exposed on window');
+} else {
+  const cases = [
+    // [label, command, ctx, expected substring in the inserted text]
+    ['bold wraps a selection', 'bold',
+      { doc: 'hello', from: 0, to: 5, selected: 'hello' }, '**hello**'],
+    ['bold on bare cursor inserts the markers', 'bold',
+      { doc: '', from: 0, to: 0, selected: '' }, '****'],
+    ['italic wraps a selection', 'italic',
+      { doc: 'hi', from: 0, to: 2, selected: 'hi' }, '*hi*'],
+    ['inline code wraps a selection', 'code',
+      { doc: 'x', from: 0, to: 1, selected: 'x' }, '`x`'],
+    ['a code block gets a fenced body', 'codeblock',
+      { doc: '', from: 0, to: 0, selected: '' }, '```\n\n```'],
+    ['a quote prefixes the line', 'quote',
+      { doc: 'line', from: 0, to: 0, selected: '' }, '> line'],
+    ['h1 prefixes the line', 'h1',
+      { doc: 'line', from: 0, to: 0, selected: '' }, '# line'],
+    ['h2 prefixes the line', 'h2',
+      { doc: 'line', from: 0, to: 0, selected: '' }, '## line'],
+    ['h3 prefixes the line', 'h3',
+      { doc: 'line', from: 0, to: 0, selected: '' }, '### line'],
+    ['a task item prefixes the line', 'task',
+      { doc: 'todo', from: 0, to: 0, selected: '' }, '- [ ] todo'],
+    ['a bullet prefixes the line', 'bullet',
+      { doc: 'item', from: 0, to: 0, selected: '' }, '- item'],
+    ['a numbered item prefixes the line', 'numbered',
+      { doc: 'item', from: 0, to: 0, selected: '' }, '1. item'],
+    ['a table is three columns wide', 'table',
+      { doc: '', from: 0, to: 0, selected: '' }, '| --- | --- | --- |']
+  ];
+  for (const [label, name, ctx, expected] of cases) {
+    const fn = CMD.commands && CMD.commands[name];
+    if (typeof fn !== 'function') { cmdProblems.push(`${label}: MDCmd.commands.${name} is not a function`); continue; }
+    const result = fn(ctx);
+    const text = result && result.changes && typeof result.changes.insert === 'string'
+      ? result.changes.insert : '';
+    if (text.indexOf(expected) === -1) {
+      cmdProblems.push(`${label}: expected ${JSON.stringify(expected)} inside ${JSON.stringify(text)}`);
+    }
+  }
+  // Toggle-off: applying the same command twice must return the document to
+  // where it started. This is the rule that is easiest to implement for half
+  // the buttons and forget for the other half.
+  for (const name of ['bold', 'italic', 'code', 'quote', 'h1', 'task', 'bullet', 'numbered']) {
+    const fn = CMD.commands && CMD.commands[name];
+    if (typeof fn !== 'function') { continue; }
+    const once = fn({ doc: 'text', from: 0, to: 4, selected: 'text' });
+    const applied = once.changes.insert;
+    const twice = fn({ doc: applied, from: 0, to: applied.length, selected: applied });
+    if (twice.changes.insert !== 'text') {
+      cmdProblems.push(`toggle-off: ${name} produced ${JSON.stringify(twice.changes.insert)} on the second press`);
     }
   }
 }
@@ -427,13 +493,18 @@ for (const item of i18nProblems) { console.log('  [ERROR] ' + item); }
 if (!i18nProblems.length) { console.log('  ok   every dictionary defines the same keys'); }
 
 console.log('');
+console.log('markdown commands:');
+for (const item of cmdProblems) { console.log('  [ERROR] ' + item); }
+if (!cmdProblems.length) { console.log('  ok   every command produces the expected markdown, and toggles off'); }
+
+console.log('');
 console.log('editor bundle:');
 for (const item of vendorProblems) { console.log('  [ERROR] ' + item); }
 if (!vendorProblems.length) { console.log('  ok   built, and exports its declared surface'); }
 
 const errorCount =
   loadErrors.length + problems.length + missingRequired.length + i18nProblems.length +
-  vendorProblems.length;
+  vendorProblems.length + cmdProblems.length;
 console.log('');
 console.log('-'.repeat(62));
 console.log('errors: ' + errorCount);
