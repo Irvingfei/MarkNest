@@ -233,6 +233,13 @@
     setFooter: setFooter,
     // The preview needs the editor's scroll position to synchronise against,
     // so the controller is reachable rather than duplicated.
-    editor: function () { return state.editor; }
+    editor: function () { return state.editor; },
+    // The format bar edits through the editor rather than around it, so that
+    // undo, the dirty flag and the preview all stay in step.
+    applyCommand: function (command) {
+      if (state.editor && state.editor.applyEdit) {
+        state.editor.applyEdit(command);
+      }
+    }
   };
 })(window);

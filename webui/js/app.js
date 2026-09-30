@@ -152,6 +152,12 @@
     if (global.TreePane) {
       global.TreePane.setCurrent(path);
     }
+    if (global.FormatBar) {
+      // Task 6 replaces this with the view state machine, which is what will
+      // decide where the bar belongs; until it exists, opening a note is the
+      // only signal there is.
+      global.FormatBar.setEnabled(true);
+    }
     if (push) {
       writeHash(path);
     }
@@ -257,6 +263,10 @@
           global.TreePane.refresh();
         }
       });
+    });
+
+    step('formatbar', function () {
+      global.FormatBar.init();
     });
 
     step('preview', function () {

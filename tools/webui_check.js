@@ -18,12 +18,17 @@ const vm = require('vm');
 const REPO_ROOT = path.dirname(__dirname);
 const WEBUI = path.join(REPO_ROOT, 'webui');
 
+// The page's own script order, less the editor bundle. The two are compared
+// mechanically further down: this list drives what is loaded here, the page
+// drives what is loaded in the browser, and a module added to one and not the
+// other loads in exactly one of them.
 const ORDER = [
   'js/i18n.js',
   'js/ui.js',
   'js/mdcmd.js',
   'js/api.js',
   'js/toshost.js',
+  'js/formatbar.js',
   'js/treepane.js',
   'js/editorpane.js',
   'js/previewpane.js',
@@ -195,8 +200,8 @@ for (const rel of ORDER) {
 /* -------------------------------------------------------- collect exports */
 
 const MODULES = {};
-for (const name of ['UI', 'I18N', 'MDCmd', 'API', 'TreePane', 'EditorPane',
-                    'PreviewPane', 'SearchPane', 'App', 'TosHost']) {
+for (const name of ['UI', 'I18N', 'MDCmd', 'FormatBar', 'API', 'TreePane',
+                    'EditorPane', 'PreviewPane', 'SearchPane', 'App', 'TosHost']) {
   const value = sandbox[name];
   if (value && (typeof value === 'object' || typeof value === 'function')) {
     MODULES[name] = new Set(Object.keys(value));
@@ -241,8 +246,8 @@ if (!i18nTables) {
 /* ------------------------------------------------- scan call sites for typos */
 
 const ALLOWED_GLOBALS = new Set([
-  'UI', 'I18N', 'MDCmd', 'API', 'TreePane', 'EditorPane', 'PreviewPane',
-  'SearchPane', 'App', 'TosHost', 'MDEditor',
+  'UI', 'I18N', 'MDCmd', 'FormatBar', 'API', 'TreePane', 'EditorPane',
+  'PreviewPane', 'SearchPane', 'App', 'TosHost', 'MDEditor',
   'window', 'document', 'navigator', 'localStorage', 'console', 'Math', 'JSON',
   'Object', 'Array', 'String', 'Number', 'Boolean', 'Date', 'RegExp', 'Promise',
   'Error', 'TypeError', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval',
@@ -301,6 +306,7 @@ const REQUIRED = {
   API: ['getHealth', 'getOptions', 'getMe', 'getTree', 'getNote', 'saveNote',
         'createNote', 'renameNote', 'deleteNote', 'search', 'indexStatus',
         'indexScan'],
+  FormatBar: ['init', 'render', 'setEnabled'],
   TreePane: ['init', 'reload', 'refresh', 'newNote', 'setCurrent', 'render',
              'current'],
   EditorPane: ['init', 'open', 'save', 'isDirty', 'currentPath', 'editor'],
@@ -319,6 +325,47 @@ for (const [moduleName, members] of Object.entries(REQUIRED)) {
   for (const member of members) {
     if (!MODULES[moduleName].has(member)) {
       missingRequired.push(`${moduleName}.${member} missing`);
+    }
+  }
+}
+
+/* ------------------------------------- ORDER and index.html must agree */
+
+/* The two lists have to be identical, item for item, and until now nothing
+ * said so. A module added to one and not the other fails quietly in exactly
+ * one of the two places that matter: it loads in this harness - which is driven
+ * by ORDER - and never reaches the browser, or it loads in the browser and is
+ * never cross-checked here. That is the "committed artefact is quietly stale"
+ * failure this repository has already been bitten by, so the comparison is
+ * mechanical rather than a sentence in a plan document.
+ *
+ * The editor bundle is dropped from the page's list for the same reason it is
+ * absent from ORDER (see the note above): it is a third-party build this
+ * sandbox cannot execute. Every other tag must match by position, and the
+ * first divergence is reported by index and by name. */
+const orderProblems = [];
+const INDEX_HTML = path.join(WEBUI, 'index.html');
+if (!fs.existsSync(INDEX_HTML)) {
+  orderProblems.push('webui/index.html is missing - the script order cannot be verified');
+} else {
+  const html = fs.readFileSync(INDEX_HTML, 'utf8');
+  const fromPage = [];
+  const tagPattern = /<script\b[^>]*\bsrc="([^"]+)"/g;
+  let tag;
+  while ((tag = tagPattern.exec(html)) !== null) {
+    // The ?v= cache buster is a release-time literal, not part of the path.
+    const src = tag[1].split('?')[0];
+    if (src !== VENDOR) {
+      fromPage.push(src);
+    }
+  }
+  const positions = Math.max(fromPage.length, ORDER.length);
+  for (let i = 0; i < positions; i += 1) {
+    if (fromPage[i] !== ORDER[i]) {
+      orderProblems.push(
+        `position ${i}: index.html loads ${JSON.stringify(fromPage[i] || null)}, ` +
+        `ORDER has ${JSON.stringify(ORDER[i] || null)}`);
+      break;
     }
   }
 }
@@ -728,13 +775,18 @@ for (const item of cmdProblems) { console.log('  [ERROR] ' + item); }
 if (!cmdProblems.length) { console.log('  ok   every command produces the expected markdown; the ten toggleable ones toggle off'); }
 
 console.log('');
+console.log('script order (ORDER vs index.html):');
+for (const item of orderProblems) { console.log('  [ERROR] ' + item); }
+if (!orderProblems.length) { console.log('  ok   index.html loads the same scripts, in the same order, as ORDER'); }
+
+console.log('');
 console.log('editor bundle:');
 for (const item of vendorProblems) { console.log('  [ERROR] ' + item); }
 if (!vendorProblems.length) { console.log('  ok   built, and exports its declared surface'); }
 
 const errorCount =
   loadErrors.length + problems.length + missingRequired.length + i18nProblems.length +
-  vendorProblems.length + cmdProblems.length;
+  vendorProblems.length + cmdProblems.length + orderProblems.length;
 console.log('');
 console.log('-'.repeat(62));
 console.log('errors: ' + errorCount);

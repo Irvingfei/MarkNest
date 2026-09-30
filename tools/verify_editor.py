@@ -48,6 +48,17 @@ def click_note(page, name):
     page.click('.tree-row:has(.tree-name:text-is("%s"))' % name)
 
 
+def app_note_visible(page, selector):
+    """Visibility inside whichever frame currently holds the application."""
+    for frame in page.frames:
+        if "/marknest/" in frame.url:
+            try:
+                return frame.is_visible(selector)
+            except Exception:  # noqa: BLE001
+                return False
+    return page.is_visible(selector)
+
+
 def main():
     httpd, port = H.serve()
     url = "http://127.0.0.1:%d/index.html" % port
@@ -102,6 +113,29 @@ def main():
             check("headings carry data-line", page.evaluate(
                 "() => document.querySelectorAll('#preview-body [data-line]').length > 3"),
                 page.evaluate("() => document.querySelectorAll('#preview-body [data-line]').length"))
+
+            print("\n4b. the format toolbar edits through the editor")
+            check("the format bar appears once a note is open",
+                  app_note_visible(page, "#format-bar"))
+            check("all thirteen buttons are present", page.evaluate(
+                "() => document.querySelectorAll('#format-bar .format-btn').length") == 13,
+                page.evaluate("() => document.querySelectorAll('#format-bar .format-btn').length"))
+            check("the tooltips are translated, not raw keys", page.evaluate(
+                "() => { var b = document.getElementById('fmt-bold');"
+                " return !!b && b.getAttribute('title').indexOf('format.') !== 0; }"),
+                page.evaluate("() => (document.getElementById('fmt-bold')||{}).title"))
+            page.click(".cm-content")
+            page.keyboard.press("Control+a")
+            page.wait_for_timeout(200)
+            page.click("#fmt-bold")
+            page.wait_for_timeout(400)
+            check("the bold command wrapped the document", page.evaluate(
+                "() => document.querySelector('.cm-content').textContent.indexOf('**') !== -1"),
+                page.evaluate("() => document.querySelector('.cm-content').textContent.slice(0, 40)"))
+            check("the editor is now marked dirty", page.evaluate(
+                "() => document.getElementById('dirty-dot').hidden === false"))
+            check("the preview followed the change", page.evaluate(
+                "() => document.querySelectorAll('#preview-body strong').length > 0"))
 
             print("\n5. saving")
             before = len(state["requests"])
