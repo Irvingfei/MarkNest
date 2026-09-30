@@ -421,7 +421,12 @@ if (!CMD) {
     if (typeof fn !== 'function') { continue; }
     const once = fn({ doc: 'text', from: 0, to: 4, selected: 'text' });
     const applied = once.changes.insert;
-    const twice = fn({ doc: applied, from: 0, to: applied.length, selected: applied });
+    // The second press must act on what the first press actually left selected:
+    // that is the selection a person's cursor is sitting in. Re-selecting the
+    // whole result by hand tests a round trip nobody performs, and passes even
+    // when the command returns a garbage selection.
+    const twice = fn({ doc: applied, from: once.selection.anchor, to: once.selection.head,
+                       selected: applied.slice(once.selection.anchor, once.selection.head) });
     if (twice.changes.insert !== 'text') {
       cmdProblems.push(`toggle-off: ${name} produced ${JSON.stringify(twice.changes.insert)} on the second press`);
     }
@@ -432,7 +437,12 @@ if (!CMD) {
     if (typeof fn !== 'function') { continue; }
     const once = fn({ doc: 'a\nb', from: 0, to: 3, selected: 'a\nb' });
     const applied = once.changes.insert;
-    const twice = fn({ doc: applied, from: 0, to: applied.length, selected: applied });
+    // The second press acts on the selection the first press returned, for the
+    // same reason as above - and here it is also what catches a block-wide
+    // endpoint shift, which puts the selection on the tail of the block instead
+    // of over all of it.
+    const twice = fn({ doc: applied, from: once.selection.anchor, to: once.selection.head,
+                       selected: applied.slice(once.selection.anchor, once.selection.head) });
     if (twice.changes.insert !== 'a\nb') {
       cmdProblems.push(`multi-line toggle-off: ${name} produced ${JSON.stringify(twice.changes.insert)} on the second press`);
     }
@@ -480,6 +490,20 @@ if (!CMD) {
         cmdProblems.push(
           `${label}: document became ${JSON.stringify(result)} instead of ${JSON.stringify('> ' + doc)}`);
       }
+    }
+  }
+  // A caret is the one case where both endpoints still shift by the whole block
+  // delta rather than per line, so the cursor lands after the marker it just
+  // inserted instead of in front of it. Nothing else here covers it: both toggle
+  // loops start from a selection, and the round-trip above reads insert only.
+  const caretQuote = CMD.commands && CMD.commands.quote;
+  if (typeof caretQuote === 'function') {
+    const caret = caretQuote({ doc: 'line', from: 0, to: 0, selected: '' });
+    if (caret.changes.insert !== '> line') {
+      cmdProblems.push(`quote with a caret inserted ${JSON.stringify(caret.changes.insert)}`);
+    } else if (caret.selection.anchor !== 2 || caret.selection.head !== 2) {
+      cmdProblems.push(
+        `quote with a caret left it at ${caret.selection.anchor}, not after the inserted marker`);
     }
   }
   // link is the one command that takes arguments beyond ctx, so it is asserted

@@ -135,14 +135,44 @@
     return true;
   }
 
+  /* Where the two endpoints land after the edit.
+   *
+   * A single block-wide delta is wrong for anything past the first line: adding
+   * a marker to two lines grows the block by two prefixes, and shifting both
+   * endpoints by that total moves the start forward by the growth of lines that
+   * begin *before* it, so the selection collapses onto the tail of the block
+   * instead of covering it. Each endpoint is therefore shifted by the growth of
+   * the lines that start strictly before it.
+   *
+   * A caret is the exception. `from === to` is a point, and a point at the
+   * start of a line would be shifted by nothing and left sitting in front of
+   * the marker it just caused; the uniform delta is exactly the growth of the
+   * one line a caret can be on, which is what puts the cursor after an inserted
+   * prefix rather than before it. */
   function blockResult(range, ctx, text) {
-    var delta = text.length - (range.end - range.start);
+    var lines = text.split('\n');
+    var growth = [];
+    var at = 0;
+    for (var i = 0; i < range.lines.length; i += 1) {
+      growth.push({ at: range.start + at, by: lines[i].length - range.lines[i].length });
+      at += range.lines[i].length + 1;
+    }
+    var uniform = text.length - (range.end - range.start);
+    var shift = function (endpoint) {
+      if (ctx.from === ctx.to) {
+        return Math.max(range.start, endpoint + uniform);
+      }
+      var delta = 0;
+      for (var j = 0; j < growth.length; j += 1) {
+        if (growth[j].at < endpoint) {
+          delta += growth[j].by;
+        }
+      }
+      return Math.max(range.start, endpoint + delta);
+    };
     return {
       changes: { from: range.start, to: range.end, insert: text },
-      selection: {
-        anchor: Math.max(range.start, ctx.from + delta),
-        head: Math.max(range.start, ctx.to + delta)
-      }
+      selection: { anchor: shift(ctx.from), head: shift(ctx.to) }
     };
   }
 
