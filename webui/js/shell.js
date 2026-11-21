@@ -440,8 +440,13 @@
   }
 
   function applyLanguage(tag) {
-    I18N.setLanguage(tag);
-    Store.settings.set('language', tag);
+    if (!tag || tag === 'auto') {
+      I18N.follow();
+      Store.settings.set('language', '');
+    } else {
+      I18N.setLanguage(tag, true);
+      Store.settings.set('language', I18N.getLanguage());
+    }
     I18N.apply(global.document);
     renderStorage();
     renderConnection();

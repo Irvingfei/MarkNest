@@ -330,6 +330,44 @@ def main():
             check("the import page mounted",
                   page.locator(".page-import .dropzone").count() == 1)
 
+            print("\n9. the interface follows the TOS language")
+            context2 = browser.new_context(viewport={"width": 1280, "height": 820},
+                                           locale="en-US")
+            context2.route(H.PROXY_GLOB, H.make_router(state))
+            page2 = context2.new_page()
+            page2.add_init_script(
+                "try { if (!localStorage.getItem('tos_language')) {"
+                " localStorage.setItem('tos_language', 'zh-cn'); } } catch (e) {}")
+            page2.goto(url, wait_until="load")
+            page2.wait_for_selector(".page-library .note-card", timeout=8000)
+            page2.wait_for_timeout(500)
+            check("the TOS language beats the browser language",
+                  page2.inner_text('#nav a[data-route="library"] span') == "文档库",
+                  page2.inner_text('#nav a[data-route="library"] span'))
+            page2.evaluate(
+                "() => localStorage.setItem('tos_language', 'en-us')")
+            page2.reload(wait_until="load")
+            page2.wait_for_selector(".page-library .note-card", timeout=8000)
+            page2.wait_for_timeout(500)
+            check("a changed TOS language is picked up on load",
+                  page2.inner_text('#nav a[data-route="library"] span') == "Library",
+                  page2.inner_text('#nav a[data-route="library"] span'))
+            page2.evaluate(
+                "() => localStorage.setItem('tos_language', 'fr-fr')")
+            page2.reload(wait_until="load")
+            page2.wait_for_selector(".page-library .note-card", timeout=8000)
+            page2.wait_for_timeout(500)
+            check("a TOS language without a dictionary renders in English",
+                  page2.inner_text('#nav a[data-route="library"] span') == "Library",
+                  page2.inner_text('#nav a[data-route="library"] span'))
+            route(page2, "#/settings", ".page-settings .settings-grid")
+            page2.wait_for_timeout(400)
+            check("the language selector starts on Follow TOS",
+                  page2.eval_on_selector(
+                      ".page-settings select", "el => el.value") == "",
+                  page2.eval_on_selector(".page-settings select", "el => el.value"))
+            context2.close()
+
             check("no uncaught error during the run", not errors, "; ".join(errors))
             browser.close()
     finally:

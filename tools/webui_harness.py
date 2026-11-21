@@ -25,6 +25,9 @@ import urllib.parse
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WEBUI = os.path.join(REPO_ROOT, "webui")
 
+with open(os.path.join(REPO_ROOT, "VERSION"), "r", encoding="utf-8") as _version_file:
+    VERSION = _version_file.read().strip()
+
 PROXY_GLOB = "**/v2/proxy/marknest/**"
 
 #: A note library large enough to be interesting and small enough to reason
@@ -325,7 +328,7 @@ def make_router(state):
 
         if path.endswith("/health"):
             return _ok(route, {
-                "status": "ok", "version": "1.1.0", "app_id": "marknest",
+                "status": "ok", "version": VERSION, "app_id": "marknest",
                 "library_ready": True, "library_readable": True,
                 "library_writable": True, "library_users": 1,
                 "share_name": "marknest-data",

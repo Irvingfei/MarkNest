@@ -13,19 +13,72 @@
 
   var started = false;
 
+  /* A language the operator picked wins; otherwise the interface follows the
+     TOS desktop, including a change made while this page is open. */
+  function explicitLanguage() {
+    var saved = Store.settings.get('language');
+    if (saved && I18N.tables[saved]) {
+      return saved;
+    }
+    return I18N.storedLanguage();
+  }
+
+  function applyLanguagePreference() {
+    var saved = explicitLanguage();
+    if (saved) {
+      I18N.setLanguage(saved, false);
+    } else {
+      I18N.follow();
+    }
+  }
+
+  function followTosLanguage() {
+    function resync() {
+      if (explicitLanguage()) {
+        return;
+      }
+      if (I18N.systemLanguage() === I18N.getLanguage()) {
+        return;
+      }
+      Shell.applyLanguage('');
+    }
+
+    try {
+      global.addEventListener('storage', function (event) {
+        if (event && event.key && event.key.indexOf('marknest.') !== 0 &&
+            /lang|locale/i.test(event.key)) {
+          resync();
+        }
+      });
+    } catch (error) {
+      /* no storage events available */
+    }
+
+    try {
+      var parentDoc = global.parent && global.parent !== global ? global.parent.document : null;
+      if (parentDoc && global.MutationObserver) {
+        new global.MutationObserver(resync).observe(parentDoc.documentElement, {
+          attributes: true,
+          attributeFilter: ['lang', 'xml:lang']
+        });
+      }
+    } catch (error) {
+      /* not embedded, or the parent is another origin */
+    }
+
+    global.addEventListener('focus', resync);
+  }
+
   function boot() {
     if (started) {
       return;
     }
     started = true;
 
-    if (Store.settings.get('language')) {
-      I18N.setLanguage(Store.settings.get('language'));
-    } else {
-      Store.settings.set('language', I18N.getLanguage());
-    }
+    applyLanguagePreference();
 
     Shell.init();
+    followTosLanguage();
 
     var routes = {
       library: Pages.library,

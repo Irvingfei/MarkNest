@@ -280,17 +280,23 @@
     var settings = Store.settings;
     var card = panel(I18N.t('settings.behavior'), I18N.t('settings.behaviorBody'));
 
-    var current = settings.get('language') || I18N.getLanguage();
+    var current = settings.get('language') || '';
     card.appendChild(settingRow(
       I18N.t('settings.language'),
       I18N.t('settings.languageHint'),
-      selectBox(LANGUAGES.map(function (entry) {
-        return { value: entry.tag, label: entry.label };
-      }), current, function (tag) {
-        Shell.applyLanguage(tag);
-        Router.refresh();
-        UI.toast(I18N.t('settings.saved'), 'ok', 1800);
-      })
+      selectBox(
+        [{ value: '', label: I18N.t('settings.languageAuto') }].concat(
+          LANGUAGES.map(function (entry) {
+            return { value: entry.tag, label: entry.label };
+          })
+        ),
+        current,
+        function (tag) {
+          Shell.applyLanguage(tag);
+          Router.refresh();
+          UI.toast(I18N.t('settings.saved'), 'ok', 1800);
+        }
+      )
     ));
 
     card.appendChild(settingRow(

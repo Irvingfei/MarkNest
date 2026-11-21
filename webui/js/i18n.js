@@ -366,7 +366,8 @@
       'settings.behavior': '使用习惯',
       'settings.behaviorBody': '打开应用时的默认位置与编辑行为。',
       'settings.language': '界面语言',
-      'settings.languageHint': '切换后立即生效，并会记住你的选择。',
+      'settings.languageHint': '默认跟随 TOS 的界面语言；手动选择后会固定使用该语言。',
+      'settings.languageAuto': '跟随 TOS 语言',
       'settings.defaultPage': '默认页面',
       'settings.defaultLibrary': '文档库',
       'settings.defaultImport': '上传导入',
@@ -790,7 +791,8 @@
       'settings.behavior': '使用習慣',
       'settings.behaviorBody': '開啟應用程式時的預設位置與編輯行為。',
       'settings.language': '介面語言',
-      'settings.languageHint': '切換後立即生效，並會記住你的選擇。',
+      'settings.languageHint': '預設跟隨 TOS 的介面語言；手動選擇後會固定使用該語言。',
+      'settings.languageAuto': '跟隨 TOS 語言',
       'settings.defaultPage': '預設頁面',
       'settings.defaultLibrary': '文件庫',
       'settings.defaultImport': '上傳匯入',
@@ -1214,7 +1216,8 @@
       'settings.behavior': 'Habits',
       'settings.behaviorBody': 'Where the app opens and how editing behaves.',
       'settings.language': 'Interface language',
-      'settings.languageHint': 'Takes effect immediately and is remembered.',
+      'settings.languageHint': 'Follows the TOS interface language by default; picking a language here fixes the choice.',
+      'settings.languageAuto': 'Follow the TOS language',
       'settings.defaultPage': 'Start page',
       'settings.defaultLibrary': 'Library',
       'settings.defaultImport': 'Import',
@@ -1292,6 +1295,159 @@
   var STORE_KEY = 'marknest.lang';
   var current = DEFAULT;
 
+  /* TOS keeps the operator's interface language in the desktop document. The
+     application is framed under the same origin, so those stores are readable;
+     the key has changed between TOS releases, so every plausible spelling is
+     probed and the value is validated before it is trusted. */
+  var TOS_KEYS = [
+    'tos_language', 'tos-lang', 'tosLanguage', 'tos_lang',
+    'language', 'lang', 'locale', 'ui_language', 'i18n_language'
+  ];
+  var TOS_PARAMS = ['lang', 'language', 'locale'];
+
+  function normalizeTag(value) {
+    var tag = String(value === undefined || value === null ? '' : value)
+      .trim().toLowerCase().replace(/_/g, '-');
+    if (!tag || tag.length > 20 || !/^[a-z]{2,3}(-[a-z0-9]{1,8})*$/.test(tag)) {
+      return null;
+    }
+    return tag;
+  }
+
+  function resolveTag(tag) {
+    if (!tag) {
+      return null;
+    }
+    if (tag.indexOf('zh') === 0) {
+      return /hk|tw|mo|hant/.test(tag) ? 'zh-hk' : 'zh-cn';
+    }
+    // Chinese and English have dictionaries; every other TOS language is
+    // rendered in the English base rather than falling back to the browser.
+    return 'en-us';
+  }
+
+  function readStore(store) {
+    if (!store) {
+      return null;
+    }
+    var i;
+    var tag;
+    for (i = 0; i < TOS_KEYS.length; i += 1) {
+      try {
+        tag = normalizeTag(store.getItem(TOS_KEYS[i]));
+      } catch (error) {
+        return null;
+      }
+      if (tag) {
+        return tag;
+      }
+    }
+    try {
+      for (i = 0; i < store.length; i += 1) {
+        var key = store.key(i);
+        if (!key || key.indexOf('marknest.') === 0 || !/lang|locale/i.test(key)) {
+          continue;
+        }
+        tag = normalizeTag(store.getItem(key));
+        if (tag) {
+          return tag;
+        }
+      }
+    } catch (error) {
+      /* treat as absent */
+    }
+    return null;
+  }
+
+  function readCookie() {
+    var text = '';
+    try {
+      text = global.document.cookie || '';
+    } catch (error) {
+      return null;
+    }
+    var parts = text.split(';');
+    for (var i = 0; i < parts.length; i += 1) {
+      var cut = parts[i].indexOf('=');
+      if (cut < 0 || !/lang|locale/i.test(parts[i].slice(0, cut))) {
+        continue;
+      }
+      var raw = parts[i].slice(cut + 1).trim();
+      try {
+        raw = decodeURIComponent(raw);
+      } catch (error) {
+        /* keep the raw value */
+      }
+      var tag = normalizeTag(raw);
+      if (tag) {
+        return tag;
+      }
+    }
+    return null;
+  }
+
+  function readParam() {
+    var query = '';
+    try {
+      query = String(global.location.search || '');
+    } catch (error) {
+      return null;
+    }
+    for (var i = 0; i < TOS_PARAMS.length; i += 1) {
+      var match = new RegExp('[?&]' + TOS_PARAMS[i] + '=([^&]+)').exec(query);
+      if (!match) {
+        continue;
+      }
+      var tag = normalizeTag(decodeURIComponent(match[1]));
+      if (tag) {
+        return tag;
+      }
+    }
+    return null;
+  }
+
+  function readParent() {
+    var parentDoc = null;
+    var parentWindow = null;
+    try {
+      parentWindow = global.parent && global.parent !== global ? global.parent : null;
+      parentDoc = parentWindow ? parentWindow.document : null;
+    } catch (error) {
+      return null;
+    }
+    if (!parentDoc) {
+      return null;
+    }
+    try {
+      var html = parentDoc.documentElement;
+      var tag = normalizeTag(html && (html.getAttribute('lang') || html.getAttribute('xml:lang')));
+      if (tag) {
+        return tag;
+      }
+    } catch (error) {
+      /* fall through to the parent's storage */
+    }
+    try {
+      return readStore(parentWindow.localStorage);
+    } catch (error) {
+      return null;
+    }
+  }
+
+  /* The raw TOS tag, whether or not this build has a dictionary for it. */
+  function tosLanguage() {
+    return readParam() || readStore(ownStore()) || readCookie() || readParent();
+  }
+
+  function ownStore() {
+    try {
+      return global.localStorage;
+    } catch (error) {
+      return null;
+    }
+  }
+
+
   function table(tag) {
     return STRINGS[tag] || STRINGS[DEFAULT];
   }
@@ -1352,21 +1508,36 @@
   }
 
   function detect() {
+    var stored = storedLanguage();
+    if (stored) {
+      return stored;
+    }
+    return systemLanguage();
+  }
+
+  /* Explicit choice, written only when the operator picks a language. */
+  function storedLanguage() {
     var stored = null;
     try {
       stored = global.localStorage.getItem(STORE_KEY);
     } catch (error) {
-      // Storage can be unavailable inside a sandboxed frame; the language then
-      // simply falls back to the browser's.
+      // Storage can be unavailable inside a sandboxed frame.
       stored = null;
     }
-    if (stored && STRINGS[stored]) {
-      return stored;
+    return STRINGS[stored] ? stored : null;
+  }
+
+  /* TOS first, then the browser. A TOS language this build has no dictionary
+     for resolves to the English base instead of the browser's preference. */
+  function systemLanguage() {
+    var tos = tosLanguage();
+    if (tos) {
+      return resolveTag(tos) || DEFAULT;
     }
     var languages = (global.navigator && (global.navigator.languages ||
       [global.navigator.language])) || [];
     for (var i = 0; i < languages.length; i += 1) {
-      var tag = String(languages[i] || '').toLowerCase();
+      var tag = normalizeTag(languages[i]);
       if (!tag) {
         continue;
       }
@@ -1410,18 +1581,30 @@
     });
   }
 
-  function setLanguage(tag) {
+  function setLanguage(tag, persist) {
     current = STRINGS[tag] ? tag : DEFAULT;
-    try {
-      global.localStorage.setItem(STORE_KEY, current);
-    } catch (error) {
-      /* not fatal */
+    if (persist !== false) {
+      try {
+        global.localStorage.setItem(STORE_KEY, current);
+      } catch (error) {
+        /* not fatal */
+      }
     }
     if (global.document && global.document.documentElement) {
       global.document.documentElement.lang = current;
     }
     apply(global.document);
     return current;
+  }
+
+  /* Drop the explicit choice and take the language from TOS. */
+  function follow() {
+    try {
+      global.localStorage.removeItem(STORE_KEY);
+    } catch (error) {
+      /* not fatal */
+    }
+    return setLanguage(systemLanguage(), false);
   }
 
   current = detect();
@@ -1433,6 +1616,10 @@
     setLanguage: setLanguage,
     getLanguage: function () { return current; },
     detect: detect,
+    systemLanguage: systemLanguage,
+    storedLanguage: storedLanguage,
+    tosLanguage: tosLanguage,
+    follow: follow,
     supported: SUPPORTED,
     // Exposed so tools/webui_check.js can compare the key sets mechanically.
     tables: STRINGS
