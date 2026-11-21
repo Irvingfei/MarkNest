@@ -326,6 +326,25 @@ def read_version():
         return json.load(handle).get("version", "1.0.0")
 
 
+def patch_platform(config_path, platform):
+    """Align the packaged config.ini platform with the build target.
+
+    The review platform compares this field against the App's bound
+    architecture, so an aarch64 build must not ship the x86_64 literal.
+    """
+    import re
+
+    with open(config_path, "r", encoding="utf-8") as handle:
+        text = handle.read()
+    patched, count = re.subn(r'"platform"\s*:\s*"[^"]*"', '"platform": "%s"' % platform, text, count=1)
+    if count != 1:
+        raise SystemExit("config.ini has no platform field to patch: %s" % config_path)
+    if patched != text:
+        with open(config_path, "w", encoding="utf-8", newline="\n") as handle:
+            handle.write(patched)
+        log("config.ini platform set to %s" % platform)
+
+
 def measure_size(root):
     total = 0
     for base, dirs, files in os.walk(root):
@@ -375,6 +394,8 @@ def assemble(platform, version, with_webui=True):
             shutil.copy2(source, os.path.join(payload_root, name))
         elif name != "%s.env" % APP_ID:
             raise SystemExit("missing required payload file: %s" % name)
+
+    patch_platform(os.path.join(payload_root, "config.ini"), platform)
 
     # Any additional top level asset (for example depends/) is copied verbatim.
     depends = os.path.join(SOURCE_APP_ROOT, "depends")
