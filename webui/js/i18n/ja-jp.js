@@ -133,6 +133,7 @@
     'library.allNotes': 'すべてのノート',
     'library.openFromNas': 'NAS から開く',
     'library.openFromNasHint': 'ノートライブラリがある NAS フォルダーを参照し、Markdown ファイルを直接開きます。',
+    'library.nasScopeHint': 'MarkNest 共有フォルダー内の Markdown ドキュメントだけを参照・表示できます。他のフォルダーや PDF などは、このフォルダーに変換して置く必要があります。',
     'library.nasUp': '上の階層',
     'library.nasEmpty': 'このフォルダーに開けるファイルはありません',
     'library.nasUnsupported': 'ここでは開けません',

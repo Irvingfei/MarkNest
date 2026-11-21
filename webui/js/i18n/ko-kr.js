@@ -133,6 +133,7 @@
     'library.allNotes': '모든 노트',
     'library.openFromNas': 'NAS에서 열기',
     'library.openFromNasHint': '노트 라이브러리가 있는 NAS 폴더를 탐색하고 Markdown 파일을 바로 엽니다.',
+    'library.nasScopeHint': 'MarkNest 공유 폴더 안의 Markdown 문서만 탐색하고 열 수 있습니다. 다른 폴더나 PDF 같은 형식은 먼저 이 폴더로 변환해 넣어야 합니다.',
     'library.nasUp': '상위 폴더',
     'library.nasEmpty': '이 폴더에 열 수 있는 파일이 없습니다',
     'library.nasUnsupported': '여기에서 열 수 없음',

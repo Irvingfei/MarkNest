@@ -131,14 +131,21 @@
       title: I18N.t('library.openFromNas'),
       subtitle: I18N.t('library.openFromNasHint'),
       body: UI.el('div', { class: 'nas-browser' }, [
+        UI.el('p', { class: 'nas-hint', text: I18N.t('library.nasScopeHint') }),
         UI.el('div', { class: 'nas-bar' }, [up, pathLabel]),
         list
-      ])
+      ]),
+      actions: [{ label: I18N.t('common.close'), close: true }]
     });
 
     function parentOf(path) {
       var at = path.lastIndexOf('/');
       return at < 0 ? '' : path.slice(0, at);
+    }
+
+    function locationLabel(path) {
+      var root = I18N.t('library.allNotes');
+      return path ? root + ' / ' + path.split('/').join(' / ') : root;
     }
 
     function openNote(path) {
@@ -183,8 +190,10 @@
       list.appendChild(UI.el('div', { class: 'nas-empty', text: I18N.t('common.loading') }));
       API.getTree(path).then(function (result) {
         current = result.path || '';
-        pathLabel.textContent = current || I18N.t('library.allNotes');
-        up.disabled = !current;
+        pathLabel.textContent = locationLabel(current);
+        // At the root there is nowhere above; showing a dead button reads as
+        // broken, so it only appears once a folder has been entered.
+        up.style.display = current ? '' : 'none';
         render(result);
       }).catch(function (error) {
         UI.toast(I18N.errorText(error), 'bad');
@@ -192,8 +201,8 @@
       });
     }
 
-    up.disabled = true;
-    pathLabel.textContent = I18N.t('library.allNotes');
+    up.style.display = 'none';
+    pathLabel.textContent = locationLabel('');
     load('');
   }
 

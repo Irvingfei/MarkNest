@@ -142,11 +142,25 @@ def main():
             check("the picker lists the folders and notes on the share",
                   page.locator(".modal .nas-row").count() == 3,
                   page.locator(".modal .nas-row").count())
+            hint = page.inner_text(".modal .nas-hint")
+            check("the picker explains what can be opened",
+                  "Markdown" in hint and "PDF" in hint, hint)
+            check("there is no dead up button at the root",
+                  page.locator(".nas-bar button").is_hidden())
             page.locator(".modal .nas-row", has_text="notes").first.click()
             page.wait_for_timeout(500)
             check("a folder opens inside the picker",
-                  page.inner_text(".nas-path-text") == "notes",
+                  page.inner_text(".nas-path-text") == "全部笔记 / notes",
                   page.inner_text(".nas-path-text"))
+            check("the up button appears inside a folder",
+                  page.locator(".nas-bar button").is_visible())
+            page.locator(".nas-bar button").click()
+            page.wait_for_timeout(500)
+            check("up returns to the root",
+                  page.inner_text(".nas-path-text") == "全部笔记",
+                  page.inner_text(".nas-path-text"))
+            page.locator(".modal .nas-row", has_text="notes").first.click()
+            page.wait_for_timeout(500)
             page.locator(".modal .nas-row", has_text="long.md").first.click()
             page.wait_for_selector(".page-reader .reader-title", timeout=8000)
             page.wait_for_timeout(500)

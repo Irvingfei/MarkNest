@@ -133,6 +133,7 @@
     'library.allNotes': 'Todas las notas',
     'library.openFromNas': 'Abrir desde el NAS',
     'library.openFromNasHint': 'Explora la carpeta del NAS que contiene tus notas y abre un archivo Markdown directamente.',
+    'library.nasScopeHint': 'Solo se pueden explorar y abrir documentos Markdown de la carpeta compartida de MarkNest. Otras carpetas o formatos como PDF deben convertirse y colocarse antes en esta carpeta.',
     'library.nasUp': 'Carpeta superior',
     'library.nasEmpty': 'No hay archivos que se puedan abrir en esta carpeta',
     'library.nasUnsupported': 'No se puede abrir aquí',

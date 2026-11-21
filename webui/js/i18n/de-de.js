@@ -133,6 +133,7 @@
     'library.allNotes': 'Alle Notizen',
     'library.openFromNas': 'Vom NAS öffnen',
     'library.openFromNasHint': 'Im NAS-Ordner der Notizen stöbern und eine Markdown-Datei direkt öffnen.',
+    'library.nasScopeHint': 'Nur Markdown-Dokumente im MarkNest-Freigabeordner können durchsucht und geöffnet werden. Andere Ordner oder Formate wie PDF müssen zuerst konvertiert und in diesem Ordner abgelegt werden.',
     'library.nasUp': 'Übergeordnet',
     'library.nasEmpty': 'Keine öffnungsfähigen Dateien in diesem Ordner',
     'library.nasUnsupported': 'Kann hier nicht geöffnet werden',

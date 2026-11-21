@@ -133,6 +133,7 @@
     'library.allNotes': 'Все заметки',
     'library.openFromNas': 'Открыть с NAS',
     'library.openFromNasHint': 'Просмотрите папку NAS с заметками и откройте файл Markdown напрямую.',
+    'library.nasScopeHint': 'Просматривать и открывать можно только документы Markdown в общей папке MarkNest. Другие папки и форматы вроде PDF нужно сначала преобразовать и поместить в эту папку.',
     'library.nasUp': 'Вверх',
     'library.nasEmpty': 'В этой папке нет файлов, которые можно открыть',
     'library.nasUnsupported': 'Нельзя открыть здесь',

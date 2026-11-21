@@ -2216,6 +2216,7 @@ body.is-resizing .sidebar { transition: none; }
 
 /* NAS file picker */
 .nas-browser { display: flex; flex-direction: column; gap: 10px; min-height: 220px; }
+.nas-hint { margin: 0; font-size: 11.5px; line-height: 1.5; color: var(--ink-3); }
 .nas-bar { display: flex; align-items: center; gap: 8px; }
 .nas-path-text {
   flex: 1 1 auto; min-width: 0;
