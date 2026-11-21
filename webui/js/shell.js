@@ -555,6 +555,8 @@
       Store.settings.set('language', I18N.getLanguage());
     }
     I18N.apply(global.document);
+    renderFolders();
+    renderWelcome();
     renderStorage();
     renderConnection();
     var route = Router.current();

@@ -296,11 +296,17 @@ def main():
             check("the interface switched language",
                   page.inner_text('#nav a[data-route="library"] span') == "Library",
                   page.inner_text('#nav a[data-route="library"] span'))
+            check("the sidebar folders switched with it",
+                  page.inner_text('#folder-list [data-folder=""] .folder-name') == "All notes",
+                  page.inner_text('#folder-list [data-folder=""] .folder-name'))
             page.locator(".page-settings select").nth(0).select_option("zh-cn")
             page.wait_for_timeout(700)
             check("the interface switched back",
                   page.inner_text('#nav a[data-route="library"] span') == "文档库",
                   page.inner_text('#nav a[data-route="library"] span'))
+            check("and the sidebar folders came back too",
+                  page.inner_text('#folder-list [data-folder=""] .folder-name') == "全部笔记",
+                  page.inner_text('#folder-list [data-folder=""] .folder-name'))
 
             before = len(state["requests"])
             page.locator(".page-settings button", has_text="重建搜索索引").click()
