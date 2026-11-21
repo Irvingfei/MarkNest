@@ -41,6 +41,10 @@
         return;
       }
       Shell.applyLanguage('');
+      var route = global.Router.current();
+      if (route && route.name !== 'read' && route.name !== 'edit') {
+        global.Router.refresh();
+      }
     }
 
     try {

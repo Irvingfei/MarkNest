@@ -457,6 +457,14 @@ def main():
             check("the TOS langModel key is followed too",
                   page2.inner_text('#nav a[data-route="library"] span') == "Bibliothek",
                   page2.inner_text('#nav a[data-route="library"] span'))
+            page2.evaluate(
+                "() => { localStorage.setItem('langModel', 'ko-kr');"
+                " window.dispatchEvent(new StorageEvent('storage',"
+                " {key: 'langModel', newValue: 'ko-kr'})); }")
+            page2.wait_for_timeout(900)
+            check("a live TOS language change refreshes the open page",
+                  page2.inner_text('.page-library .page-title') == "모든 노트",
+                  page2.inner_text('.page-library .page-title'))
             route(page2, "#/settings", ".page-settings .settings-grid")
             page2.wait_for_timeout(400)
             check("the language selector starts on Follow TOS",
