@@ -434,7 +434,7 @@
     if (!list.length) {
       nodes.folderList.appendChild(UI.el('div', {
         class: 'folder-empty',
-        text: I18N.t('library.emptyTitle')
+        text: I18N.t('nav.noFolders')
       }));
     }
   }

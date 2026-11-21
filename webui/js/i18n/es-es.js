@@ -82,6 +82,7 @@
     'nav.foldersSection': 'Carpetas',
     'nav.newFolder': 'Nueva carpeta',
     'nav.allNotes': 'Todas las notas',
+    'nav.noFolders': 'Aún no hay subcarpetas; las notas están en la carpeta raíz.',
     'nav.storage': 'Almacenamiento',
     'nav.menu': 'Abrir menú',
     'nav.collapse': 'Contraer barra lateral',

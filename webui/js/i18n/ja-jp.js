@@ -82,6 +82,7 @@
     'nav.foldersSection': 'フォルダー',
     'nav.newFolder': '新規フォルダー',
     'nav.allNotes': 'すべてのノート',
+    'nav.noFolders': 'サブフォルダーはまだありません。ノートはルートフォルダーに保存されています。',
     'nav.storage': 'ストレージ',
     'nav.menu': 'メニューを開く',
     'nav.collapse': 'サイドバーを折りたたむ',

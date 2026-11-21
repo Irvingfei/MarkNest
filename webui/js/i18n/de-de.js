@@ -82,6 +82,7 @@
     'nav.foldersSection': 'Ordner',
     'nav.newFolder': 'Neuer Ordner',
     'nav.allNotes': 'Alle Notizen',
+    'nav.noFolders': 'Noch keine Unterordner; Notizen liegen im Stammordner.',
     'nav.storage': 'Speicher',
     'nav.menu': 'Menü öffnen',
     'nav.collapse': 'Seitenleiste einklappen',

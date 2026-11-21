@@ -82,6 +82,7 @@
     'nav.foldersSection': 'Папки',
     'nav.newFolder': 'Новая папка',
     'nav.allNotes': 'Все заметки',
+    'nav.noFolders': 'Подпапок пока нет; заметки лежат в корневой папке.',
     'nav.storage': 'Хранилище',
     'nav.menu': 'Открыть меню',
     'nav.collapse': 'Свернуть боковую панель',

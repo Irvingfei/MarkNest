@@ -535,6 +535,12 @@ def main():
 
             page.reload(wait_until="load")
             page.wait_for_selector(".page-settings .settings-grid", timeout=8000)
+            route(page, "#/library", ".page-library .empty-state")
+            page.wait_for_timeout(300)
+            check("the sidebar folder hint talks about folders, not notes",
+                  page.inner_text("#folder-list .folder-empty") ==
+                  "暂无子文件夹，笔记都保存在根目录。",
+                  page.inner_text("#folder-list .folder-empty"))
             route(page, "#/import", ".page-import .dropzone")
             check("the destination picker is hidden when the library has no subfolders",
                   page.locator(".page-import .panel:has(.panel-title:text-is('导入到'))")

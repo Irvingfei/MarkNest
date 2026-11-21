@@ -82,6 +82,7 @@
     'nav.foldersSection': '폴더',
     'nav.newFolder': '새 폴더',
     'nav.allNotes': '모든 노트',
+    'nav.noFolders': '하위 폴더가 없습니다. 노트는 루트 폴더에 저장됩니다.',
     'nav.storage': '저장 공간',
     'nav.menu': '메뉴 열기',
     'nav.collapse': '사이드바 접기',

@@ -82,6 +82,7 @@
     'nav.foldersSection': 'Dossiers',
     'nav.newFolder': 'Nouveau dossier',
     'nav.allNotes': 'Toutes les notes',
+    'nav.noFolders': "Pas encore de sous-dossier ; les notes sont à la racine.",
     'nav.storage': 'Stockage',
     'nav.menu': 'Ouvrir le menu',
     'nav.collapse': 'Réduire le panneau latéral',
