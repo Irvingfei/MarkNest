@@ -193,17 +193,22 @@ class StubApi:
             "totals": totals,
         }
 
-    def stats(self):
+    def stats(self, folder=""):
         view = self.library_view()
+        prefix = (folder + "/") if folder else ""
+        notes = [path for path in self.notes
+                 if path.lower().endswith(DEMO_NOTE_EXTENSIONS)
+                 and (not prefix or path.startswith(prefix))]
+        folders = [item for item in view["folders"]
+                   if not prefix or item["path"].startswith(prefix)]
         total = 4 * 1024 ** 4
         used = int(1.25 * 1024 ** 4)
         return {
-            "notes": view["count"],
-            "bytes": view["totals"]["bytes"],
+            "notes": len(notes),
+            "bytes": sum(len(self.notes[path].encode("utf-8")) for path in notes),
             "disk": {"total": total, "used": used, "free": total - used},
-            "folders": len(view["folders"]),
-            "versions": (sum(len(items) for items in self.versions.values())
-                         if self.notes else 0),
+            "folders": len(folders),
+            "versions": sum(len(self.versions.get(path, [])) for path in notes),
             "attachments": False,
             "engine": "fts5",
             "last_indexed": _now_iso(),
@@ -362,7 +367,7 @@ def make_router(state):
             limit = int((query.get("limit") or ["2000"])[0])
             return _ok(route, api.library_view(limit))
         if path.endswith("/stats"):
-            return _ok(route, api.stats())
+            return _ok(route, api.stats((query.get("folder") or [""])[0]))
         if path.endswith("/folders/new") and request.method == "POST":
             body = json.loads(request.post_data or "{}")
             target = (body.get("path") or "").strip()

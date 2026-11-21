@@ -411,7 +411,12 @@ def test_history_lifecycle():
     index.scan(user, force=True)
 
     class FakeRequest:
-        pass
+        def __init__(self, query=None):
+            self.query = query or {}
+
+        def param(self, name, default=None):
+            values = self.query.get(name)
+            return values[0] if values else default
 
     request = FakeRequest()
     request.user = user
@@ -419,6 +424,18 @@ def test_history_lifecycle():
     stats = api.get_stats(request)
     check("the statistics count the revisions of a live note",
           stats["versions"] >= 2, stats)
+
+    library.create_note(user, "other/note.md", "other\n")
+    library.save_note(user, "other/note.md", "other two\n")
+    index.scan(user, force=True)
+    scoped_request = FakeRequest({"folder": ["h"]})
+    scoped_request.user = user
+    scoped = api.get_stats(scoped_request)
+    check("a folder scope counts only its own notes", scoped["notes"] == 1, scoped)
+    check("a folder scope has no subfolders of its own", scoped["folders"] == 0, scoped)
+    check("a folder scope counts only its own revisions",
+          scoped["versions"] == len(history.history_store.list(user, "h/note.md")),
+          scoped)
 
     versions = history.history_store.list(user, "h/note.md")
     oldest = versions[-1]["id"]
@@ -436,10 +453,11 @@ def test_history_lifecycle():
     check("the note itself survives clearing history",
           library.read_note(user, "h/note.md")["content"] == "three\n")
     check("cleared history reports no revisions",
-          history.history_store.count(user) == 0,
-          history.history_store.count(user))
+          history.history_store.count(user, "h") == 0,
+          history.history_store.count(user, "h"))
 
     library.delete_note(user, "h/note.md")
+    library.delete_note(user, "other/note.md")
     index.scan(user, force=True)
     stats = api.get_stats(request)
     check("deleting the note drops its revisions",

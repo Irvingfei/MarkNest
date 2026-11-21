@@ -261,10 +261,17 @@ class HistoryStore:
             "content": row["content"] or "",
         }
 
-    def count(self, user=None):
+    def count(self, user=None, folder=None):
         conn = self._connect()
         try:
-            if user:
+            if user and folder:
+                prefix = folder + "/"
+                row = conn.execute(
+                    "SELECT COUNT(*) AS n FROM versions "
+                    "WHERE user=? AND substr(rel_path, 1, ?)=?",
+                    (user, len(prefix), prefix),
+                ).fetchone()
+            elif user:
                 row = conn.execute(
                     "SELECT COUNT(*) AS n FROM versions WHERE user=?", (user,)
                 ).fetchone()

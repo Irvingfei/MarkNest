@@ -215,7 +215,7 @@
 
   function renderStats() {
     UI.clear(nodes.stats);
-    var stats = Store.state.stats;
+    var stats = Store.statsFor(state.folder);
     var view = Store.state.library;
     var notes = stats ? stats.notes : (view ? view.totals.notes : 0);
     var folders = stats ? stats.folders : (view ? view.folders.length : 0);
@@ -315,7 +315,7 @@
       UI.clear(nodes.body);
       UI.skeleton(nodes.body, 6);
     }
-    Store.loadLibraryAndStats().then(function () {
+    Store.loadLibraryAndStats(state.folder).then(function () {
       state.busy = false;
       if (!mounted) {
         return;
@@ -647,7 +647,7 @@
   }
 
   function refresh() {
-    return Store.loadLibraryAndStats().then(function () {
+    return Store.loadLibraryAndStats(state.folder).then(function () {
       if (mounted) {
         renderStats();
         renderNotes();

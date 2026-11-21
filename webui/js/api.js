@@ -345,8 +345,8 @@
       return request('/library' + queryString({ limit: limit }));
     },
 
-    getStats: function () {
-      return request('/stats');
+    getStats: function (folder) {
+      return request('/stats' + queryString({ folder: folder }));
     },
 
     getFolders: function () {

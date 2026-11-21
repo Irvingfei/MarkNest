@@ -254,17 +254,22 @@ class Api:
     def get_stats(self, request):
         user = request.user
         indexer.maybe_scan(user)
-        totals = store.totals(user)
+        folder = (request.param("folder") or "").strip().strip("/")
+        totals = store.totals(user, folder)
         stats = store.stats()
+        folders = library.list_folders(user)
+        if folder:
+            prefix = folder + "/"
+            folders = [item for item in folders if item["path"].startswith(prefix)]
         return {
             "notes": totals["notes"],
             "bytes": totals["bytes"],
             "disk": _disk_usage(config.share_root()),
-            "folders": len(library.list_folders(user)),
+            "folders": len(folders),
             # Revisions only exist through their note. With an empty library
             # any row still on disk belongs to a note deleted outside the
             # application and can never be opened again.
-            "versions": history_store.count(user) if totals["notes"] else 0,
+            "versions": history_store.count(user, folder) if totals["notes"] else 0,
             "attachments": False,
             "engine": "fts5" if store.fts else "scan",
             "last_indexed": stats.get("last_indexed") or "",

@@ -106,6 +106,8 @@
     options: null,
     library: null,
     stats: null,
+    scopeStats: null,
+    scopeFolder: '',
     folders: null,
     loaded: false,
     libraryError: null
@@ -140,14 +142,32 @@
   /* The library page needs both; the shell only needs the counts. Failures are
      surfaced by the caller rather than swallowed, but the counts are optional -
      a failed /stats must not blank a library that loaded fine. */
-  function loadLibraryAndStats() {
+  function loadLibraryAndStats(folder) {
+    folder = folder || '';
     return loadLibrary().then(function (view) {
-      return loadStats().catch(function () {
+      var globalStats = loadStats().catch(function () {
         return null;
-      }).then(function () {
+      });
+      var scopedStats = folder
+        ? API.getStats(folder).catch(function () { return null; })
+        : null;
+      return globalStats.then(function () {
+        return scopedStats;
+      }).then(function (scoped) {
+        state.scopeFolder = folder;
+        state.scopeStats = scoped || state.stats;
         return view;
       });
     });
+  }
+
+  /* The shell always wants the whole-library counts; the library page shows
+     the scope it is looking at, so it asks for those numbers instead. */
+  function statsFor(folder) {
+    if (state.scopeFolder === (folder || '') && state.scopeStats) {
+      return state.scopeStats;
+    }
+    return state.stats;
   }
 
   function noteByPath(path) {
@@ -220,6 +240,7 @@
     loadLibrary: loadLibrary,
     loadStats: loadStats,
     loadLibraryAndStats: loadLibraryAndStats,
+    statsFor: statsFor,
     noteByPath: noteByPath,
     folderCount: folderCount,
     assetUrl: assetUrl,

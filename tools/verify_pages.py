@@ -107,6 +107,7 @@ def main():
                   page.locator(".page-library .note-row").count())
             page.locator(".library-toolbar .segmented button").nth(0).click()
             page.wait_for_timeout(300)
+            root_stats = page.locator(".page-library .stat-value").all_inner_texts()
             page.click('#folder-list [data-folder="notes"]')
             page.wait_for_timeout(700)
             check("a folder scopes the list",
@@ -114,8 +115,20 @@ def main():
                   page.locator(".page-library .note-card").count())
             check("the toolbar shows the scope",
                   "notes" in page.inner_text(".library-scope"))
+            scoped_stats = page.locator(".page-library .stat-value").all_inner_texts()
+            check("the statistics follow the folder scope",
+                  scoped_stats[:2] == ["2", "0"], scoped_stats)
+            check("and only count that folder's revisions",
+                  scoped_stats[3] == "0", scoped_stats)
+            check("the size reflects the folder, not the whole library",
+                  scoped_stats[2] != root_stats[2],
+                  "%s vs %s" % (scoped_stats[2], root_stats[2]))
             page.click('#folder-list [data-folder=""]')
             page.wait_for_timeout(700)
+            check("all notes restores the library-wide statistics",
+                  page.locator(".page-library .stat-value").all_inner_texts() ==
+                  root_stats,
+                  page.locator(".page-library .stat-value").all_inner_texts())
             check("all notes returns to the full list",
                   page.locator(".page-library .note-card").count() == 4,
                   page.locator(".page-library .note-card").count())

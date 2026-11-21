@@ -258,14 +258,23 @@ class IndexStore:
             raise IndexUnavailable("the search index could not be read")
         return [dict(row) for row in rows]
 
-    def totals(self, user):
+    def totals(self, user, folder=None):
+        """Note count and bytes, optionally limited to one folder subtree."""
         conn = self._connect()
         try:
-            row = conn.execute(
-                "SELECT COUNT(*) AS notes, COALESCE(SUM(size_bytes), 0) AS bytes "
-                "FROM notes WHERE user=?",
-                (user,),
-            ).fetchone()
+            if folder:
+                prefix = folder + "/"
+                row = conn.execute(
+                    "SELECT COUNT(*) AS notes, COALESCE(SUM(size_bytes), 0) AS bytes "
+                    "FROM notes WHERE user=? AND substr(rel_path, 1, ?)=?",
+                    (user, len(prefix), prefix),
+                ).fetchone()
+            else:
+                row = conn.execute(
+                    "SELECT COUNT(*) AS notes, COALESCE(SUM(size_bytes), 0) AS bytes "
+                    "FROM notes WHERE user=?",
+                    (user,),
+                ).fetchone()
         except sqlite3.Error:
             return {"notes": 0, "bytes": 0}
         return {"notes": int(row["notes"]) if row else 0,
