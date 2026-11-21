@@ -479,6 +479,21 @@ class Api:
         indexer.scan(request.user)
         return note
 
+    def delete_version(self, request):
+        rel = request.param("path") or ""
+        version_id = _as_int(request.param("id"), "id", 0, minimum=1)
+        if not rel:
+            raise BadRequest("parameter path is required")
+        library.resolve_note(request.user, rel, must_exist=True)
+        return library.delete_version(request.user, rel, version_id)
+
+    def delete_versions(self, request):
+        rel = request.param("path") or ""
+        if not rel:
+            raise BadRequest("parameter path is required")
+        library.resolve_note(request.user, rel, must_exist=True)
+        return library.delete_versions(request.user, rel)
+
     # ------------------------------------------------------------------ notes
 
     def get_tree(self, request):
@@ -633,6 +648,10 @@ class Api:
                 return 200, self.delete_note(request)
             if path == "/folders":
                 return 200, self.delete_folder(request)
+            if path == "/versions":
+                return 200, self.delete_version(request)
+            if path == "/versions/all":
+                return 200, self.delete_versions(request)
             raise NotFound("no such endpoint: %s" % path)
 
         raise MethodNotAllowed("method %s is not allowed on %s" % (method, path))

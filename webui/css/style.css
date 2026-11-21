@@ -2002,6 +2002,21 @@ body.is-resizing .sidebar { transition: none; }
 
 /* version history */
 .version-list { min-height: 120px; }
+.version-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.version-count { font-size: 11.5px; color: var(--ink-3); }
+.version-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.version-delete:hover { color: var(--danger); background: var(--danger-soft); }
 .version-table {
   border: 1px solid var(--line);
   border-radius: 10px;

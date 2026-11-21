@@ -79,6 +79,7 @@ from lib.errors import (  # noqa: E402
     NoteNotFound,
     NoteTooLarge,
     PathInvalid,
+    VersionNotFound,
 )
 
 USER = "alice"
@@ -418,6 +419,25 @@ def test_history_lifecycle():
     stats = api.get_stats(request)
     check("the statistics count the revisions of a live note",
           stats["versions"] >= 2, stats)
+
+    versions = history.history_store.list(user, "h/note.md")
+    oldest = versions[-1]["id"]
+    library.delete_version(user, "h/note.md", oldest)
+    check("a deleted version leaves the history",
+          len(history.history_store.list(user, "h/note.md")) == len(versions) - 1,
+          history.history_store.list(user, "h/note.md"))
+    check("the note itself survives a version deletion",
+          library.read_note(user, "h/note.md")["content"] == "three\n")
+    raises("deleting a version that is gone is refused", VersionNotFound,
+           library.delete_version, user, "h/note.md", oldest)
+    cleared = library.delete_versions(user, "h/note.md")
+    check("clearing history removes every revision",
+          cleared["deleted"] == len(versions) - 1, cleared)
+    check("the note itself survives clearing history",
+          library.read_note(user, "h/note.md")["content"] == "three\n")
+    check("cleared history reports no revisions",
+          history.history_store.count(user) == 0,
+          history.history_store.count(user))
 
     library.delete_note(user, "h/note.md")
     index.scan(user, force=True)

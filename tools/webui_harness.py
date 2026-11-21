@@ -416,6 +416,24 @@ def make_router(state):
             api.notes[target] = chosen["content"]
             api.touch(target)
             return _ok(route, api.note_doc(target))
+        if path.endswith("/versions/all") and request.method == "DELETE":
+            target = (query.get("path") or [""])[0]
+            if target not in api.notes:
+                return _fail(route, 404, 3005, "the note does not exist")
+            removed = len(api.versions.get(target, []))
+            api.versions.pop(target, None)
+            return _ok(route, {"path": target, "deleted": removed})
+        if path.endswith("/versions") and request.method == "DELETE":
+            target = (query.get("path") or [""])[0]
+            version_id = int((query.get("id") or ["0"])[0] or 0)
+            if target not in api.notes:
+                return _fail(route, 404, 3005, "the note does not exist")
+            items = api.versions.get(target, [])
+            kept = [item for item in items if item["id"] != version_id]
+            if len(kept) == len(items):
+                return _fail(route, 404, 3016, "that version does not exist")
+            api.versions[target] = kept
+            return _ok(route, {"path": target, "id": version_id, "deleted": True})
         if path.endswith("/versions"):
             target = (query.get("path") or [""])[0]
             if target not in api.notes:

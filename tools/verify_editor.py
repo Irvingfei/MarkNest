@@ -152,6 +152,37 @@ def main():
             check("both dialogs closed", page.locator(".modal").count() == 0,
                   page.locator(".modal").count())
 
+            print("\n5b. deleting version records")
+            page.locator(".reader-actions .btn").nth(1).click()
+            page.wait_for_selector(".modal .version-row", timeout=6000)
+            before_rows = page.locator(".modal .version-row").count()
+            page.locator(".modal .version-row .version-delete").first.click()
+            page.wait_for_selector(".modal-foot .btn-danger")
+            page.locator(".modal-foot .btn-danger").last.click()
+            page.wait_for_timeout(700)
+            check("a version delete was sent",
+                  any(method == "DELETE" and path.endswith("/versions")
+                      for method, path, _ in state["requests"]))
+            check("the deleted record left the list",
+                  page.locator(".modal .version-row").count() == before_rows - 1,
+                  page.locator(".modal .version-row").count())
+            page.locator(".modal .version-head .btn-danger").click()
+            page.wait_for_selector(".modal-foot .btn-danger")
+            page.locator(".modal-foot .btn-danger").last.click()
+            page.wait_for_timeout(700)
+            check("a clear-all request was sent",
+                  any(method == "DELETE" and path.endswith("/versions/all")
+                      for method, path, _ in state["requests"]))
+            check("clearing history shows the empty state",
+                  page.locator(".modal .empty-state").count() == 1,
+                  page.locator(".modal .version-row").count())
+            check("clearing history keeps the note",
+                  "First draft." in api.notes["welcome.md"])
+            page.keyboard.press("Escape")
+            page.wait_for_timeout(300)
+            check("the history dialog closed", page.locator(".modal").count() == 0,
+                  page.locator(".modal").count())
+
             print("\n6. the editor opens the same note")
             page.locator(".reader-actions .btn-primary").click()
             page.wait_for_selector(".page-editor .cm-content", timeout=8000)

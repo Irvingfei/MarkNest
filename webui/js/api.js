@@ -422,6 +422,14 @@
       return postJson('/versions/restore', { path: path, id: id });
     },
 
+    deleteVersion: function (path, id) {
+      return request('/versions' + queryString({ path: path, id: id }), { method: 'DELETE' });
+    },
+
+    deleteVersions: function (path) {
+      return request('/versions/all' + queryString({ path: path }), { method: 'DELETE' });
+    },
+
     search: function (q, limit) {
       return request('/search' + queryString({ q: q, limit: limit }));
     },

@@ -127,6 +127,17 @@
           }));
           return;
         }
+        host.appendChild(UI.el('div', { class: 'version-head' }, [
+          UI.el('span', {
+            class: 'version-count',
+            text: I18N.t('editor.versionCount', { n: list.length })
+          }),
+          UI.el('button', {
+            type: 'button',
+            class: 'btn btn-sm btn-danger',
+            onclick: function () { removeAll(); }
+          }, [UI.icon('trash'), UI.el('span', { text: I18N.t('editor.versionDeleteAll') })])
+        ]));
         var table = UI.el('div', { class: 'version-table' });
         list.forEach(function (version, index) {
           table.appendChild(UI.el('div', { class: 'version-row' }, [
@@ -135,13 +146,24 @@
               UI.el('div', { class: 'version-ago', text: UI.formatTimeAgo(version.created_ns || version.created_at) })
             ]),
             UI.el('div', { class: 'version-size', text: UI.formatBytes(version.size) }),
-            index === 0 ? UI.badge('accent', I18N.t('time.justNow')) : null,
-            UI.el('button', {
-              type: 'button',
-              class: 'btn btn-sm',
-              text: I18N.t('editor.versionRestore'),
-              onclick: function () { restore(version); }
-            })
+            UI.el('div', { class: 'version-mark' }, [
+              index === 0 ? UI.badge('accent', I18N.t('time.justNow')) : null
+            ]),
+            UI.el('div', { class: 'version-actions' }, [
+              UI.el('button', {
+                type: 'button',
+                class: 'btn btn-sm',
+                text: I18N.t('editor.versionRestore'),
+                onclick: function () { restore(version); }
+              }),
+              UI.el('button', {
+                type: 'button',
+                class: 'icon-btn icon-btn-sm version-delete',
+                title: I18N.t('editor.versionDelete'),
+                'aria-label': I18N.t('editor.versionDelete'),
+                onclick: function () { remove(version); }
+              }, [UI.icon('trash')])
+            ])
           ]));
         });
         host.appendChild(table);
@@ -167,6 +189,46 @@
             onRestore(restored);
           }
           return restored;
+        });
+      }).catch(function (error) {
+        UI.toast((error && error.message) || I18N.t('err.unknown'), 'bad');
+      });
+    }
+
+    function remove(version) {
+      UI.confirm({
+        title: I18N.t('editor.versionDelete'),
+        message: I18N.t('editor.versionDeleteConfirm', {
+          time: UI.formatDateTime(version.created_at)
+        }),
+        confirmLabel: I18N.t('common.delete'),
+        danger: true
+      }).then(function (ok) {
+        if (!ok) {
+          return null;
+        }
+        return API.deleteVersion(note.path, version.id).then(function () {
+          UI.toast(I18N.t('editor.versionDeleted'), 'ok');
+          load();
+        });
+      }).catch(function (error) {
+        UI.toast((error && error.message) || I18N.t('err.unknown'), 'bad');
+      });
+    }
+
+    function removeAll() {
+      UI.confirm({
+        title: I18N.t('editor.versionDeleteAll'),
+        message: I18N.t('editor.versionDeleteAllConfirm'),
+        confirmLabel: I18N.t('common.delete'),
+        danger: true
+      }).then(function (ok) {
+        if (!ok) {
+          return null;
+        }
+        return API.deleteVersions(note.path).then(function () {
+          UI.toast(I18N.t('editor.versionDeleteAllDone'), 'ok');
+          load();
         });
       }).catch(function (error) {
         UI.toast((error && error.message) || I18N.t('err.unknown'), 'bad');

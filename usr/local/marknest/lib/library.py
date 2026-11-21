@@ -50,6 +50,7 @@ from .errors import (
     NoteTooLarge,
     PathDenied,
     PathInvalid,
+    VersionNotFound,
 )
 from .history import history_store
 from .logging_setup import get_logger
@@ -748,6 +749,23 @@ def list_versions(user, rel, limit=None):
 
 def read_version(user, rel, version_id):
     return history_store.require(user, rel, version_id)
+
+
+def delete_version(user, rel, version_id):
+    """Remove one revision. The note on disk is untouched.
+
+    History rows are only reachable through their note, so a revision that is
+    gone from the database cannot be restored later; the caller confirms first.
+    """
+    if history_store.get(user, rel, version_id) is None:
+        raise VersionNotFound("that version does not exist")
+    removed = history_store.delete_version(user, rel, version_id)
+    return {"path": rel, "id": int(version_id), "deleted": removed}
+
+
+def delete_versions(user, rel):
+    """Remove every revision of a note, leaving the note itself in place."""
+    return {"path": rel, "deleted": history_store.delete_all(user, rel)}
 
 
 def restore_version(user, rel, version_id):

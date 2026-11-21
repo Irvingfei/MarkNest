@@ -152,6 +152,37 @@ class HistoryStore:
             except sqlite3.Error as exc:
                 log.info("cannot move history %s -> %s: %s", source, target, exc)
 
+    def delete_version(self, user, rel_path, version_id):
+        """Remove one revision, returning whether a row was removed."""
+        with self._write_lock:
+            conn = self._connect()
+            try:
+                with conn:
+                    cur = conn.execute(
+                        "DELETE FROM versions WHERE user=? AND rel_path=? AND id=?",
+                        (user, rel_path, int(version_id)),
+                    )
+                    return cur.rowcount > 0
+            except sqlite3.Error as exc:
+                log.info("cannot delete version %s of %s/%s: %s",
+                         version_id, user, rel_path, exc)
+                return False
+
+    def delete_all(self, user, rel_path):
+        """Remove every revision of a note, returning how many were removed."""
+        with self._write_lock:
+            conn = self._connect()
+            try:
+                with conn:
+                    cur = conn.execute(
+                        "DELETE FROM versions WHERE user=? AND rel_path=?",
+                        (user, rel_path),
+                    )
+                    return max(0, cur.rowcount)
+            except sqlite3.Error as exc:
+                log.info("cannot clear history for %s/%s: %s", user, rel_path, exc)
+                return 0
+
     def delete_path(self, user, rel_path):
         """Drop the revisions of a note that no longer exists.
 
