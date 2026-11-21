@@ -123,13 +123,11 @@
   function crumbFor(path) {
     if (!path) {
       return [
-        { label: I18N.t('nav.library'), href: Router.href('library', {}) },
-        { label: I18N.t('editor.untitled') }
+        { label: I18N.t('nav.library'), href: Router.href('library', {}) }
       ];
     }
-    var items = Shell.folderCrumb(Render.folderOf(path));
-    items.push({ label: Render.stemOf(path) });
-    return items;
+    // The top bar carries the folders only; the note name is the heading.
+    return Shell.folderCrumb(Render.folderOf(path));
   }
 
   /* ----------------------------------------------------------------- build */
@@ -1211,7 +1209,7 @@
       }
       return API.deleteNote(path).then(function () {
         state.dirty = false;
-        UI.toast(I18N.t('reader.deleted'), 'ok');
+        UI.toast(I18N.t('reader.deleted', { name: path }), 'ok');
         return Store.loadLibraryAndStats().catch(function () { return null; });
       }).then(function () {
         Shell.renderFolders();

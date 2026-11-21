@@ -18,7 +18,14 @@ const vm = require('vm');
 const REPO_ROOT = path.dirname(__dirname);
 const WEBUI = path.join(REPO_ROOT, 'webui');
 
+const LOCALE_DIR = path.join(WEBUI, 'js', 'i18n');
+const LOCALES = fs.existsSync(LOCALE_DIR)
+  ? fs.readdirSync(LOCALE_DIR).filter((name) => name.endsWith('.js')).sort()
+      .map((name) => 'js/i18n/' + name)
+  : [];
+
 const ORDER = [
+  ...LOCALES,
   'js/i18n.js',
   'js/ui.js',
   'js/api.js',
@@ -67,7 +74,11 @@ function makeElement(tag) {
     children: [],
     childNodes: [],
     attributes: {},
-    style: {},
+    style: {
+      setProperty(name, value) { this[name] = String(value); },
+      getPropertyValue(name) { return this[name] || ''; },
+      removeProperty(name) { delete this[name]; }
+    },
     dataset: {},
     className: '',
     textContent: '',

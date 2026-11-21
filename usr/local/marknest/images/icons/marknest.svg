@@ -1,16 +1,37 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="MarkNest">
-  <!-- A sheet of notes with a folded corner. The application's whole subject is
-       a folder of ordinary Markdown files, so the mark is the file itself
-       rather than an abstract symbol, and it stays legible at 32px where a
-       busier drawing would turn to mud.
-       Transparent background on purpose: the platform composites the icon over
-       its own surfaces, and a filled square would show as a tile. -->
-  <path d="M120 64 H296 V160 H392 V448 a32 32 0 0 1 -32 32 H120 a32 32 0 0 1 -32 -32 V96 a32 32 0 0 1 32 -32 Z"
-        fill="#2b5fd9"/>
-  <path d="M296 64 L392 160 L296 160 Z" fill="#5b8cf5"/>
-  <g fill="#ffffff">
-    <rect x="152" y="216" width="144" height="26" rx="13"/>
-    <rect x="152" y="274" width="176" height="26" rx="13"/>
-    <rect x="152" y="332" width="120" height="26" rx="13"/>
-  </g>
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#357a5b"/>
+      <stop offset="1" stop-color="#1d4a37"/>
+    </linearGradient>
+    <linearGradient id="paper" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fbf8ef"/>
+      <stop offset="1" stop-color="#efe9d8"/>
+    </linearGradient>
+  </defs>
+
+  <!-- A tiled badge rather than a floating sheet: the mark needs enough
+       contrast to survive a 32px launcher grid, and the green tile carries
+       the application's accent colour. -->
+  <rect x="24" y="24" width="464" height="464" rx="112" fill="url(#tile)"/>
+  <rect x="26" y="26" width="460" height="460" rx="110" fill="none"
+        stroke="#ffffff" stroke-opacity="0.10" stroke-width="4"/>
+
+  <!-- Two woven arcs: the nest that holds the note. -->
+  <path d="M104 402 C158 452 354 452 408 402" fill="none" stroke="#8fc3a8"
+        stroke-width="22" stroke-linecap="round"/>
+  <path d="M128 434 C178 466 334 466 384 434" fill="none" stroke="#5f9b7d"
+        stroke-width="14" stroke-linecap="round" opacity="0.9"/>
+
+  <!-- The note: a paper sheet with a folded corner, the app's subject. -->
+  <path d="M148 120 a28 28 0 0 1 28 -28 h116 l64 64 v196 a28 28 0 0 1 -28 28
+           h-152 a28 28 0 0 1 -28 -28 z" fill="url(#paper)"/>
+  <path d="M292 92 l64 64 h-64 z" fill="#d3e4d8"/>
+  <path d="M292 92 l64 64" fill="none" stroke="#b9d3c2" stroke-width="4"/>
+
+  <!-- The Markdown mark: a heavy M and a down arrow. -->
+  <path d="M176 300 V202 h26 l30 40 30 -40 h26 v98 h-26 v-54 l-30 40
+           l-30 -40 v54 z" fill="#24523d"/>
+  <path d="M324 202 v88 m-18 -18 l18 18 18 -18" fill="none" stroke="#24523d"
+        stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

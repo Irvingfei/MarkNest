@@ -35,7 +35,7 @@
     nodes.scroll = scroll;
 
     Shell.setTitle(Render.stemOf(path));
-    Shell.setCrumb(crumbFor(path, Render.stemOf(path)));
+    Shell.setCrumb(crumbFor(path));
     Shell.setActions([]);
     loading();
 
@@ -62,10 +62,10 @@
     Shell.setTitle((params && params.p) ? Render.stemOf(params.p) : I18N.t('reader.title'));
   }
 
-  function crumbFor(path, title) {
-    var items = Shell.folderCrumb(Render.folderOf(path));
-    items.push({ label: title });
-    return items;
+  function crumbFor(path) {
+    // The article heading is the current note; the trail only carries its
+    // folders so the title is not printed twice at the top of the page.
+    return Shell.folderCrumb(Render.folderOf(path));
   }
 
   function loading() {
@@ -149,7 +149,7 @@
       })]),
       UI.el('span', { class: 'dot' }),
       UI.el('span', null, [UI.icon('file'), UI.el('span', {
-        text: I18N.t('reader.updated') + ' ' + UI.formatTimeAgo(note.mtime_ns)
+        text: I18N.t('reader.updated', { time: UI.formatTimeAgo(note.mtime_ns) })
       })])
     ]));
 
@@ -222,7 +222,7 @@
     nodes.scroll.appendChild(shell);
 
     Shell.setTitle(title);
-    Shell.setCrumb(crumbFor(note.path, title));
+    Shell.setCrumb(crumbFor(note.path));
     renderTopActions();
 
     Render.hydrateImages(prose, note.path).then(bindLinks);
@@ -397,7 +397,7 @@
         return;
       }
       API.deleteNote(note.path).then(function () {
-        UI.toast(I18N.t('reader.deleted'), 'ok');
+        UI.toast(I18N.t('reader.deleted', { name: note.path }), 'ok');
         return Store.loadLibraryAndStats().catch(function () { return null; });
       }).then(function () {
         Shell.renderFolders();

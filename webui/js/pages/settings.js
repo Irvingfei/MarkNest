@@ -11,7 +11,13 @@
   var LANGUAGES = [
     { tag: 'zh-cn', label: '简体中文' },
     { tag: 'zh-hk', label: '繁體中文' },
-    { tag: 'en-us', label: 'English' }
+    { tag: 'en-us', label: 'English' },
+    { tag: 'ja-jp', label: '日本語' },
+    { tag: 'ko-kr', label: '한국어' },
+    { tag: 'de-de', label: 'Deutsch' },
+    { tag: 'fr-fr', label: 'Français' },
+    { tag: 'es-es', label: 'Español' },
+    { tag: 'ru-ru', label: 'Русский' }
   ];
 
   var nodes = {};
@@ -93,7 +99,6 @@
 
     scroll.appendChild(UI.el('div', { class: 'page-head' }, [
       UI.el('div', { class: 'page-head-text' }, [
-        UI.el('div', { class: 'eyebrow', text: I18N.t('nav.settings') }),
         UI.el('h1', { class: 'page-title', text: I18N.t('settings.title') }),
         UI.el('p', { class: 'page-sub', text: I18N.t('settings.subtitle') })
       ])
@@ -109,8 +114,7 @@
     grid.appendChild(buildAbout());
 
     Shell.setCrumb([
-      { label: I18N.t('nav.library'), href: Router.href('library', {}) },
-      { label: I18N.t('nav.settings') }
+      { label: I18N.t('nav.library'), href: Router.href('library', {}) }
     ]);
     Shell.setTitle(I18N.t('settings.title'));
     Shell.setActions([]);

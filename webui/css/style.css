@@ -329,6 +329,36 @@ h1, h2, h3, h4, p { margin: 0; }
 .collapse-btn { opacity: 0; transition: opacity 0.15s ease; }
 .sidebar:hover .collapse-btn, .collapse-btn:focus-visible { opacity: 1; }
 
+/* Drag handle on the sidebar's right edge. It is a real separator so the
+   width can also be changed from the keyboard. */
+.sidebar-resizer {
+  position: absolute;
+  top: 0;
+  right: -4px;
+  width: 8px;
+  height: 100%;
+  z-index: 6;
+  cursor: col-resize;
+  touch-action: none;
+}
+.sidebar-resizer::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 2px;
+  border-radius: 2px;
+  background: transparent;
+  transition: background 0.15s ease;
+}
+.sidebar-resizer:hover::after,
+.sidebar-resizer:focus-visible::after,
+body.is-resizing .sidebar-resizer::after { background: var(--accent); }
+.app.is-collapsed .sidebar-resizer { display: none; }
+body.is-resizing { cursor: col-resize; user-select: none; }
+body.is-resizing .sidebar { transition: none; }
+
 .search-trigger {
   display: flex;
   align-items: center;
@@ -2097,13 +2127,17 @@ h1, h2, h3, h4, p { margin: 0; }
     bottom: 0;
     left: 0;
     z-index: 70;
-    width: var(--sidebar-w);
-    flex-basis: var(--sidebar-w);
+    width: min(var(--sidebar-w), 86vw);
+    flex-basis: min(var(--sidebar-w), 86vw);
     padding-top: calc(var(--host-top) + 14px);
     padding-bottom: calc(var(--host-bottom) + 10px);
     transform: translateX(-102%);
     box-shadow: var(--shadow-lg);
   }
+  /* The rail toggle and the drag handle belong to the docked sidebar; in the
+     drawer they would overlap the brand and resize a panel that is already
+     sized to the viewport. */
+  .collapse-btn, .sidebar-resizer { display: none; }
   .app.is-menu-open .sidebar { transform: none; }
   .app.is-collapsed .sidebar { width: var(--sidebar-w); flex-basis: var(--sidebar-w); padding-left: 12px; padding-right: 12px; }
   .app.is-collapsed .brand-text,

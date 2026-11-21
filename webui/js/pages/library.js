@@ -73,7 +73,13 @@
   }
 
   function folderTrail(folder) {
-    return Shell.folderCrumb(folder);
+    if (!folder) {
+      return Shell.folderCrumb('');
+    }
+    // The heading already names the folder being viewed, so the trail stops at
+    // its parent instead of repeating it in the top bar.
+    var parent = folder.indexOf('/') === -1 ? '' : folder.slice(0, folder.lastIndexOf('/'));
+    return Shell.folderCrumb(parent);
   }
 
   /* ------------------------------------------------------------------ head */
@@ -85,7 +91,6 @@
       ? I18N.t('library.inFolder', { name: state.folder })
       : I18N.t('library.subtitle');
     nodes.head.appendChild(UI.el('div', { class: 'page-head-text' }, [
-      UI.el('div', { class: 'eyebrow', text: I18N.t('nav.library') }),
       UI.el('h1', { class: 'page-title', text: title }),
       UI.el('p', { class: 'page-sub', text: sub })
     ]));
@@ -335,7 +340,9 @@
       return UI.emptyState({
         icon: 'folder',
         title: I18N.t('library.emptyFolder'),
-        body: I18N.t('library.emptyFolderBody'),
+        body: I18N.t('library.emptyFolderBody', {
+          name: lastSegment(state.folder) || state.folder
+        }),
         actions: [UI.el('button', {
           type: 'button',
           class: 'btn btn-primary',
@@ -508,7 +515,7 @@
         return;
       }
       API.deleteNote(note.path).then(function () {
-        UI.toast(I18N.t('library.deleted'), 'ok');
+        UI.toast(I18N.t('library.deleted', { name: note.title || note.path }), 'ok');
         refresh();
       }).catch(Shell.reportError);
     });

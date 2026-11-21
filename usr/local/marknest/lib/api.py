@@ -243,7 +243,10 @@ class Api:
             "notes": totals["notes"],
             "bytes": totals["bytes"],
             "folders": len(library.list_folders(user)),
-            "versions": history_store.count(user),
+            # Revisions only exist through their note. With an empty library
+            # any row still on disk belongs to a note deleted outside the
+            # application and can never be opened again.
+            "versions": history_store.count(user) if totals["notes"] else 0,
             "attachments": False,
             "engine": "fts5" if store.fts else "scan",
             "last_indexed": stats.get("last_indexed") or "",

@@ -13,8 +13,8 @@ So: `VERSION` at the repository root is the only place the number is authored.
 Every other occurrence is generated from it by this script.
 
 Usage:
-    python tools/bump_version.py --bump patch     # 1.0.1 -> 1.0.2, then sync
-    python tools/bump_version.py --set 2.0.0      # explicit version, then sync
+    python tools/bump_version.py --bump patch     # 1.1.1 -> 1.1.002, then sync
+    python tools/bump_version.py --set 2.0.000    # explicit version, then sync
     python tools/bump_version.py --sync           # rewrite derived files only
     python tools/bump_version.py --check          # verify, non-zero on drift
 """
@@ -36,6 +36,7 @@ POSTINST = os.path.join(REPO_ROOT, "DEBIAN", "postinst")
 INDEX_HTML = os.path.join(REPO_ROOT, "webui", "index.html")
 
 SEMVER = re.compile(r"^(\d+)\.(\d+)\.(\d+)$")
+PATCH_DIGITS = 3
 
 
 def read_version():
@@ -47,16 +48,24 @@ def parse(version):
     match = SEMVER.match(version)
     if not match:
         raise SystemExit("VERSION must be MAJOR.MINOR.PATCH, found %r" % version)
-    return tuple(int(part) for part in match.groups())
+    major, minor, patch = (int(part) for part in match.groups())
+    if patch >= 10 ** PATCH_DIGITS:
+        raise SystemExit("VERSION patch must fit in %d digits" % PATCH_DIGITS)
+    return major, minor, patch
+
+
+def format_version(major, minor, patch):
+    """Write the patch with three digits (1.1.002), the TOS listing format."""
+    return "%d.%d.%03d" % (major, minor, patch)
 
 
 def bump(version, level):
     major, minor, patch = parse(version)
     if level == "major":
-        return "%d.0.0" % (major + 1)
+        return format_version(major + 1, 0, 0)
     if level == "minor":
-        return "%d.%d.0" % (major, minor + 1)
-    return "%d.%d.%d" % (major, minor, patch + 1)
+        return format_version(major, minor + 1, 0)
+    return format_version(major, minor, patch + 1)
 
 
 # --------------------------------------------------------------------------- #

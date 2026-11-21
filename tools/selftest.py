@@ -395,6 +395,52 @@ def test_limits():
     raises("an empty path is refused", NoteNotFound, library.read_note, USER, "")
 
 
+def test_history_lifecycle():
+    print("\n10. History follows its note, and the statistics follow the history")
+    from lib import history
+    from lib.api import Api
+
+    user = "history-check"
+    library.create_note(user, "h/note.md", "one\n")
+    library.save_note(user, "h/note.md", "two\n")
+    library.save_note(user, "h/note.md", "three\n")
+    check("saving records revisions", history.history_store.count(user) >= 2,
+          history.history_store.count(user))
+
+    index.scan(user, force=True)
+
+    class FakeRequest:
+        pass
+
+    request = FakeRequest()
+    request.user = user
+    api = Api()
+    stats = api.get_stats(request)
+    check("the statistics count the revisions of a live note",
+          stats["versions"] >= 2, stats)
+
+    library.delete_note(user, "h/note.md")
+    index.scan(user, force=True)
+    stats = api.get_stats(request)
+    check("deleting the note drops its revisions",
+          history.history_store.count(user) == 0,
+          history.history_store.count(user))
+    check("an emptied library reports no revisions",
+          stats["versions"] == 0, stats)
+
+    # The folder purge reaches descendants only: the LIKE prefix must not treat
+    # "_" as a single-character wildcard.
+    store = history.history_store
+    store.record(user, "p_1/a.md", "escape probe\n")
+    store.record(user, "pX1/b.md", "neighbour\n")
+    store.delete_tree(user, "p_1")
+    check("a folder purge leaves a similarly named folder alone",
+          store.count(user) == 1, store.count(user))
+    check("the surviving revision is the neighbour's",
+          len(store.list(user, "pX1/b.md")) == 1)
+    store.delete_tree(user, "")
+
+
 def main():
     print("MarkNest backend self test")
     print("work directory: %s" % WORK_DIR)
@@ -415,6 +461,7 @@ def main():
         test_index_freshness()
         test_identity_validation()
         test_limits()
+        test_history_lifecycle()
     finally:
         print("\n" + "-" * 62)
         print("passed: %d   failed: %d" % (PASSED, FAILED))

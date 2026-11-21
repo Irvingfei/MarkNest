@@ -55,6 +55,8 @@
       });
     }
 
+    initSidebarResize();
+
     var menu = $('btn-menu');
     if (menu) {
       menu.addEventListener('click', function () { setMenuOpen(!nodes.app.classList.contains('is-menu-open')); });
@@ -103,6 +105,112 @@
     I18N.apply(global.document);
     renderIdentity();
     renderConnection();
+  }
+
+  /* The sidebar width is a preference, not a fixed layout constant. The rail
+     collapse and the drawer keep their own widths; only the docked, expanded
+     sidebar can be dragged. */
+  var sidebarMin = 220;
+  var sidebarMax = 400;
+  var sidebarDefault = 258;
+  var sidebarKey = 'marknest.sidebarWidth';
+
+  function initSidebarResize() {
+    var grip = $('sidebar-resizer');
+    if (!grip) {
+      return;
+    }
+
+    var saved = sidebarDefault;
+    try {
+      var raw = parseInt(global.localStorage.getItem(sidebarKey), 10);
+      if (!isNaN(raw)) {
+        saved = raw;
+      }
+    } catch (error) {
+      /* storage may be unavailable; the default is fine */
+    }
+    applySidebarWidth(saved);
+
+    function applySidebarWidth(width) {
+      var clamped = Math.max(sidebarMin, Math.min(sidebarMax, width));
+      nodes.app.style.setProperty('--sidebar-w', clamped + 'px');
+      return clamped;
+    }
+
+    function persist(width) {
+      try {
+        global.localStorage.setItem(sidebarKey, String(width));
+      } catch (error) {
+        /* not fatal */
+      }
+    }
+
+    function currentWidth() {
+      return Math.round(nodes.sidebar.getBoundingClientRect().width);
+    }
+
+    function canResize() {
+      if (nodes.app.classList.contains('is-collapsed')) {
+        return false;
+      }
+      return !(global.matchMedia && global.matchMedia('(max-width: 980px)').matches);
+    }
+
+    grip.addEventListener('pointerdown', function (event) {
+      if (!canResize()) {
+        return;
+      }
+      event.preventDefault();
+      var startX = event.clientX;
+      var startWidth = currentWidth();
+      var width = startWidth;
+      try {
+        grip.setPointerCapture(event.pointerId);
+      } catch (error) {
+        /* pointer capture is a convenience, not a requirement */
+      }
+      global.document.body.classList.add('is-resizing');
+
+      function move(moveEvent) {
+        width = applySidebarWidth(startWidth + moveEvent.clientX - startX);
+      }
+      function finish() {
+        global.document.body.classList.remove('is-resizing');
+        grip.removeEventListener('pointermove', move);
+        grip.removeEventListener('pointerup', finish);
+        grip.removeEventListener('pointercancel', finish);
+        persist(width);
+      }
+      grip.addEventListener('pointermove', move);
+      grip.addEventListener('pointerup', finish);
+      grip.addEventListener('pointercancel', finish);
+    });
+
+    grip.addEventListener('keydown', function (event) {
+      if (!canResize()) {
+        return;
+      }
+      var width = currentWidth();
+      var next;
+      if (event.key === 'ArrowLeft') {
+        next = applySidebarWidth(width - 16);
+      } else if (event.key === 'ArrowRight') {
+        next = applySidebarWidth(width + 16);
+      } else if (event.key === 'Home') {
+        next = applySidebarWidth(sidebarDefault);
+      } else {
+        return;
+      }
+      event.preventDefault();
+      persist(next);
+    });
+
+    grip.addEventListener('dblclick', function () {
+      if (canResize()) {
+        persist(applySidebarWidth(sidebarDefault));
+      }
+    });
   }
 
   function setMenuOpen(open) {
@@ -201,13 +309,11 @@
       setCrumb(folderCrumb(route.params.f || ''));
     } else if (route.name === 'import') {
       setCrumb([
-        { label: I18N.t('nav.library'), href: Router.href('library', {}) },
-        { label: I18N.t('nav.import') }
+        { label: I18N.t('nav.library'), href: Router.href('library', {}) }
       ]);
     } else if (route.name === 'settings') {
       setCrumb([
-        { label: I18N.t('nav.library'), href: Router.href('library', {}) },
-        { label: I18N.t('nav.settings') }
+        { label: I18N.t('nav.library'), href: Router.href('library', {}) }
       ]);
     }
   }
@@ -315,7 +421,7 @@
     if (!list.length) {
       nodes.folderList.appendChild(UI.el('div', {
         class: 'folder-empty',
-        text: I18N.t('library.emptyFolderBody')
+        text: I18N.t('library.emptyTitle')
       }));
     }
   }
@@ -380,8 +486,9 @@
   }
 
   function removeFolder(path) {
+    var name = path.split('/').pop() || path;
     UI.confirm({
-      title: I18N.t('library.deleteFolderTitle'),
+      title: I18N.t('library.deleteFolderTitle', { name: name }),
       message: I18N.t('library.deleteFolderConfirm'),
       confirmLabel: I18N.t('common.delete'),
       danger: true
@@ -390,7 +497,7 @@
         return;
       }
       API.deleteFolder(path).then(function () {
-        UI.toast(I18N.t('library.folderDeleted'), 'ok');
+        UI.toast(I18N.t('library.folderDeleted', { name: name }), 'ok');
         return Store.loadLibraryAndStats();
       }).then(function () {
         renderFolders();
@@ -415,7 +522,7 @@
       }
       var path = value.indexOf('/') === -1 && parent ? parent + '/' + value : value;
       return API.createFolder(path).then(function (result) {
-        UI.toast(I18N.t('library.folderCreated'), 'ok');
+        UI.toast(I18N.t('library.folderCreated', { name: result.path || path }), 'ok');
         return Store.loadLibraryAndStats().then(function () {
           return result;
         });

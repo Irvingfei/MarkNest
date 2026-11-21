@@ -673,6 +673,7 @@ def delete_note(user, rel):
     except OSError as exc:
         log.warning("cannot delete %s: %s", path, exc)
         raise LibraryNotWritable("the note could not be deleted")
+    history_store.delete_path(user, rel)
     return {"path": rel, "deleted": True}
 
 
@@ -734,6 +735,7 @@ def delete_folder(user, rel):
     except OSError as exc:
         log.warning("cannot delete folder %s: %s", path, exc)
         raise LibraryNotWritable("the folder could not be deleted")
+    history_store.delete_tree(user, rel)
     return {"path": rel, "deleted": True}
 
 

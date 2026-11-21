@@ -1,10 +1,12 @@
 /* MarkNest for TOS - translations.
 
-   Three dictionaries with identical key sets. Parity is not a style preference:
-   translate() falls back to the default language, so a key present in one
-   dictionary and missing in another shows an English sentence inside a Chinese
-   interface instead of failing. tools/webui_check.js compares the key sets
-   mechanically so that cannot happen quietly.
+   Three dictionaries live inline; six more are registered on
+   window.MARKNEST_I18N by js/i18n/<tag>.js and merged before the supported
+   list is built. All nine carry identical key sets. Parity is not a style
+   preference: translate() falls back to the default language, so a key present
+   in one dictionary and missing in another shows an English sentence inside a
+   Chinese interface instead of failing. tools/webui_check.js compares the key
+   sets mechanically so that cannot happen quietly.
 
    Keys are namespaced `area.subject`. `t()` returns the key itself when it is
    missing, which makes an omission show up as `editor.foo` on screen rather
@@ -15,7 +17,7 @@
 
   var STRINGS = {
     'zh-cn': {
-      'app.name': 'MarkNest 笔记',
+      'app.name': 'MarkNest',
       'app.subtitle': 'NAS 上的 Markdown 笔记库',
       'app.tagline': '把想法留在自己的硬盘上',
 
@@ -97,6 +99,7 @@
       'nav.storage': '存储空间',
       'nav.menu': '打开菜单',
       'nav.collapse': '收起侧栏',
+      'nav.resizeSidebar': '拖动调整侧栏宽度',
       'nav.expand': '展开侧栏',
       'nav.quick': '快速开始',
       'nav.libraryHint': '浏览全部笔记',
@@ -440,7 +443,7 @@
     },
 
     'zh-hk': {
-      'app.name': 'MarkNest 筆記',
+      'app.name': 'MarkNest',
       'app.subtitle': 'NAS 上的 Markdown 筆記庫',
       'app.tagline': '把想法留在自己的硬碟上',
 
@@ -522,6 +525,7 @@
       'nav.storage': '儲存空間',
       'nav.menu': '開啟選單',
       'nav.collapse': '收起側欄',
+      'nav.resizeSidebar': '拖曳調整側欄寬度',
       'nav.expand': '展開側欄',
       'nav.quick': '快速開始',
       'nav.libraryHint': '瀏覽全部筆記',
@@ -947,6 +951,7 @@
       'nav.storage': 'Storage',
       'nav.menu': 'Open menu',
       'nav.collapse': 'Collapse sidebar',
+      'nav.resizeSidebar': 'Resize sidebar',
       'nav.expand': 'Expand sidebar',
       'nav.quick': 'Quick start',
       'nav.libraryHint': 'Browse every note',
@@ -1290,7 +1295,16 @@
     }
   };
 
-  var SUPPORTED = ['zh-cn', 'zh-hk', 'en-us'];
+  /* Additional dictionaries are loaded as plain scripts before this file so a
+     language can be added without touching the three built-in tables. */
+  var EXTRA = global.MARKNEST_I18N || {};
+  Object.keys(EXTRA).forEach(function (tag) {
+    if (EXTRA[tag]) {
+      STRINGS[tag] = EXTRA[tag];
+    }
+  });
+
+  var SUPPORTED = Object.keys(STRINGS);
   var DEFAULT = 'en-us';
   var STORE_KEY = 'marknest.lang';
   var current = DEFAULT;
@@ -1314,16 +1328,41 @@
     return tag;
   }
 
-  function resolveTag(tag) {
+  function tagFor(tag) {
     if (!tag) {
       return null;
     }
     if (tag.indexOf('zh') === 0) {
       return /hk|tw|mo|hant/.test(tag) ? 'zh-hk' : 'zh-cn';
     }
-    // Chinese and English have dictionaries; every other TOS language is
-    // rendered in the English base rather than falling back to the browser.
-    return 'en-us';
+    if (tag.indexOf('en') === 0) {
+      return 'en-us';
+    }
+    if (tag.indexOf('ja') === 0) {
+      return 'ja-jp';
+    }
+    if (tag.indexOf('ko') === 0) {
+      return 'ko-kr';
+    }
+    if (tag.indexOf('de') === 0) {
+      return 'de-de';
+    }
+    if (tag.indexOf('fr') === 0) {
+      return 'fr-fr';
+    }
+    if (tag.indexOf('es') === 0) {
+      return 'es-es';
+    }
+    if (tag.indexOf('ru') === 0) {
+      return 'ru-ru';
+    }
+    return null;
+  }
+
+  function resolveTag(tag) {
+    // A TOS language this build has no dictionary for is rendered in the
+    // English base rather than falling back to the browser's preference.
+    return tagFor(tag) || DEFAULT;
   }
 
   function readStore(store) {
@@ -1541,11 +1580,9 @@
       if (!tag) {
         continue;
       }
-      if (tag.indexOf('zh') === 0) {
-        return /hk|tw|mo|hant/.test(tag) ? 'zh-hk' : 'zh-cn';
-      }
-      if (tag.indexOf('en') === 0) {
-        return 'en-us';
+      var supported = tagFor(tag);
+      if (supported) {
+        return supported;
       }
     }
     return DEFAULT;

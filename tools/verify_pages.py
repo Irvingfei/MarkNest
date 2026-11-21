@@ -78,6 +78,9 @@ def main():
             check("a plain text file is not offered as a note",
                   page.locator(".note-card-title", has_text="plain").count() == 0)
 
+            check("the library title is not repeated as an eyebrow",
+                  page.locator(".page-library .eyebrow").count() == 0)
+
             print("\n2. search, view switch and folder scope")
             page.fill(".library-toolbar input[type=search]", "roadmap")
             page.wait_for_timeout(400)
@@ -110,6 +113,22 @@ def main():
             check("all notes returns to the full list",
                   page.locator(".page-library .note-card").count() == 4,
                   page.locator(".page-library .note-card").count())
+
+            page.locator(".page-library .note-card").first.click()
+            page.wait_for_selector(".page-reader .reader-title", timeout=8000)
+            page.wait_for_timeout(500)
+            meta = page.inner_text(".page-reader .reader-meta")
+            check("the reader fills in the update time",
+                  "更新于" in meta and "{" not in meta, meta)
+            check("the reader title is shown once",
+                  page.locator(".page-reader .reader-title").count() == 1,
+                  page.locator(".page-reader .reader-title").count())
+            reader_title = page.inner_text(".page-reader .reader-title")
+            reader_crumb = page.inner_text(".page-reader .reader-crumb")
+            check("the breadcrumb carries the folder, not the title again",
+                  reader_title not in reader_crumb,
+                  "%s / %s" % (reader_crumb, reader_title))
+            route(page, "#/library", ".page-library .note-card")
 
             print("\n3. a note is created and another deleted")
             page.click("#topbar-actions .btn-primary")
@@ -146,6 +165,12 @@ def main():
             check("the folder appears in the sidebar", True)
             check("the folder was created on the backend",
                   any(path.endswith("/folders/new") for _, path, _ in state["requests"]))
+            page.click('#folder-list [data-folder="archive"]')
+            page.wait_for_selector(".page-library .empty-state", timeout=6000)
+            page.wait_for_timeout(400)
+            empty_body = page.inner_text(".page-library .empty-body")
+            check("the empty folder names itself without a placeholder",
+                  "archive" in empty_body and "{" not in empty_body, empty_body)
             page.click('#folder-list [data-folder="archive"]', button="right")
             page.wait_for_selector("#overlay-root .menu")
             menu_item(page, "删除文件夹").click()
@@ -160,6 +185,8 @@ def main():
 
             print("\n5. the import queue handles every verdict")
             route(page, "#/import", ".page-import .dropzone")
+            check("the import title is not repeated as an eyebrow",
+                  page.locator(".page-import .eyebrow").count() == 0)
             page.set_input_files(".page-import input[type=file]", [
                 {"name": "hello.md", "mimeType": "text/markdown",
                  "buffer": b"# Hello\n\nImported body.\n"},
@@ -228,6 +255,11 @@ def main():
             print("\n7. settings persist and apply")
             route(page, "#/settings", ".page-settings .settings-grid")
             page.wait_for_timeout(600)
+            check("the settings title is shown once",
+                  page.locator(".page-settings .page-head h1").count() == 1,
+                  page.locator(".page-settings .page-head h1").count())
+            check("and no eyebrow repeats it above",
+                  page.locator(".page-settings .eyebrow").count() == 0)
             check("the data panel is populated",
                   page.locator(".page-settings .data-cell").count() == 4,
                   page.locator(".page-settings .data-cell").count())
@@ -289,7 +321,44 @@ def main():
                   restored.get("fontSize") == "md" and
                   restored.get("defaultPage") == "library", restored)
 
-            print("\n8. the shell adapts to a narrow frame")
+            print("\n8. the sidebar width can be dragged and is remembered")
+            page.set_viewport_size({"width": 1280, "height": 820})
+            route(page, "#/library", ".page-library .note-card")
+            page.wait_for_timeout(400)
+            width_before = page.evaluate(
+                "() => Math.round(document.querySelector('.sidebar').getBoundingClientRect().width)")
+            grip = page.locator("#sidebar-resizer")
+            box = grip.bounding_box()
+            start_y = box["y"] + min(180, box["height"] / 2)
+            page.mouse.move(box["x"] + box["width"] / 2, start_y)
+            page.mouse.down()
+            page.mouse.move(box["x"] + box["width"] / 2 + 70, start_y, steps=6)
+            page.mouse.up()
+            page.wait_for_timeout(300)
+            width_after = page.evaluate(
+                "() => Math.round(document.querySelector('.sidebar').getBoundingClientRect().width)")
+            check("dragging the right edge widens the sidebar",
+                  width_after >= width_before + 50,
+                  "%d -> %d" % (width_before, width_after))
+            stored_width = page.evaluate(
+                "() => parseInt(localStorage.getItem('marknest.sidebarWidth'), 10)")
+            check("the new width is stored", stored_width == width_after,
+                  "%s vs %s" % (stored_width, width_after))
+            page.reload(wait_until="load")
+            page.wait_for_selector(".page-library .note-card", timeout=8000)
+            page.wait_for_timeout(400)
+            width_reload = page.evaluate(
+                "() => Math.round(document.querySelector('.sidebar').getBoundingClientRect().width)")
+            check("the width survives a reload", width_reload == width_after,
+                  "%d vs %d" % (width_reload, width_after))
+            grip.focus()
+            page.keyboard.press("Home")
+            page.wait_for_timeout(250)
+            width_reset = page.evaluate(
+                "() => Math.round(document.querySelector('.sidebar').getBoundingClientRect().width)")
+            check("Home restores the default width", width_reset == 258, width_reset)
+
+            print("\n9. the shell adapts to a narrow frame")
             page.set_viewport_size({"width": 900, "height": 760})
             route(page, "#/library", ".page-library .note-card")
             page.wait_for_timeout(500)
@@ -309,6 +378,10 @@ def main():
             open_left = page.evaluate(
                 "() => document.querySelector('.sidebar').getBoundingClientRect().left")
             check("the sidebar slid into view (%.0f)" % open_left, open_left >= -1)
+            check("the resizer is hidden while the sidebar is a drawer",
+                  not page.locator("#sidebar-resizer").is_visible())
+            check("and the collapse toggle is hidden too",
+                  not page.locator(".collapse-btn").is_visible())
             page.click("#scrim")
             page.wait_for_timeout(350)
             check("the scrim closes the drawer",
@@ -330,7 +403,7 @@ def main():
             check("the import page mounted",
                   page.locator(".page-import .dropzone").count() == 1)
 
-            print("\n9. the interface follows the TOS language")
+            print("\n10. the interface follows the TOS language")
             context2 = browser.new_context(viewport={"width": 1280, "height": 820},
                                            locale="en-US")
             context2.route(H.PROXY_GLOB, H.make_router(state))
@@ -353,7 +426,15 @@ def main():
                   page2.inner_text('#nav a[data-route="library"] span') == "Library",
                   page2.inner_text('#nav a[data-route="library"] span'))
             page2.evaluate(
-                "() => localStorage.setItem('tos_language', 'fr-fr')")
+                "() => localStorage.setItem('tos_language', 'ja-jp')")
+            page2.reload(wait_until="load")
+            page2.wait_for_selector(".page-library .note-card", timeout=8000)
+            page2.wait_for_timeout(500)
+            check("a newly added dictionary is used for its TOS language",
+                  page2.inner_text('#nav a[data-route="library"] span') == "ライブラリ",
+                  page2.inner_text('#nav a[data-route="library"] span'))
+            page2.evaluate(
+                "() => localStorage.setItem('tos_language', 'hu-hu')")
             page2.reload(wait_until="load")
             page2.wait_for_selector(".page-library .note-card", timeout=8000)
             page2.wait_for_timeout(500)
@@ -367,6 +448,18 @@ def main():
                       ".page-settings select", "el => el.value") == "",
                   page2.eval_on_selector(".page-settings select", "el => el.value"))
             context2.close()
+
+            print("\n11. an emptied library reports no stale revisions")
+            api.notes.clear()
+            api.versions.clear()
+            page.set_viewport_size({"width": 1280, "height": 820})
+            route(page, "#/settings", ".page-settings .settings-grid")
+            page.wait_for_timeout(700)
+            cells = page.locator(
+                ".page-settings .data-cell .data-value").all_inner_texts()
+            check("the note count is zero", cells and cells[0] == "0", cells)
+            check("and the revision count is zero",
+                  len(cells) > 1 and cells[1] == "0", cells)
 
             check("no uncaught error during the run", not errors, "; ".join(errors))
             browser.close()

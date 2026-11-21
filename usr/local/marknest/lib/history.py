@@ -46,6 +46,12 @@ CREATE INDEX IF NOT EXISTS idx_versions_note
 """
 
 
+def _like_prefix(prefix):
+    """Turn a path prefix into a LIKE pattern with wildcards escaped."""
+    escaped = prefix.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return escaped + "%"
+
+
 class HistoryStore:
     """Thread-safe store for note revisions."""
 
@@ -145,6 +151,38 @@ class HistoryStore:
                     )
             except sqlite3.Error as exc:
                 log.info("cannot move history %s -> %s: %s", source, target, exc)
+
+    def delete_path(self, user, rel_path):
+        """Drop the revisions of a note that no longer exists.
+
+        History is only reachable through its note, so keeping rows for a
+        deleted note would count towards the library statistics without any
+        way to open, restore or remove them from the interface.
+        """
+        with self._write_lock:
+            conn = self._connect()
+            try:
+                with conn:
+                    conn.execute(
+                        "DELETE FROM versions WHERE user=? AND rel_path=?",
+                        (user, rel_path),
+                    )
+            except sqlite3.Error as exc:
+                log.info("cannot drop history for %s/%s: %s", user, rel_path, exc)
+
+    def delete_tree(self, user, rel_dir):
+        """Drop revisions for every note under a deleted folder."""
+        prefix = (rel_dir.rstrip("/") + "/") if rel_dir else ""
+        with self._write_lock:
+            conn = self._connect()
+            try:
+                with conn:
+                    conn.execute(
+                        "DELETE FROM versions WHERE user=? AND rel_path LIKE ? ESCAPE '\\'",
+                        (user, _like_prefix(prefix)),
+                    )
+            except sqlite3.Error as exc:
+                log.info("cannot drop history under %s/%s: %s", user, rel_dir, exc)
 
     # --------------------------------------------------------------------- reads
 

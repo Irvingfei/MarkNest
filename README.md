@@ -1,8 +1,8 @@
-# MarkNest 笔记
+# MarkNest
 
 **把笔记以普通 `.md` 文件保存在 NAS 共享文件夹里的 TOS 7 应用。**
 
-![版本](https://img.shields.io/badge/version-1.1.1-2f6f4e)
+![版本](https://img.shields.io/badge/version-1.1.002-2f6f4e)
 ![TOS](https://img.shields.io/badge/TOS-7.0%2B-2f6f4e)
 ![架构](https://img.shields.io/badge/arch-x86__64%20%7C%20aarch64-2f6f4e)
 
@@ -14,7 +14,7 @@ MarkNest 不是又一个把内容锁进数据库的笔记服务。它把每一�
 
 **五个页面，一条完整的写作路径**
 
-- **文档库**：按文件夹树浏览笔记，卡片上直接看到摘要、大小与更新时间；支持网格/列表切换、按名称或时间排序、当前范围过滤，以及跨全部笔记的全文搜索（`Ctrl K`）。
+- **文档库**：按文件夹树浏览笔记，卡片上直接看到摘要、大小与更新时间；支持网格/列表切换、按名称或时间排序、当前范围过滤，以及跨全部笔记的全文搜索（`Ctrl K`）。左侧边栏宽度可以拖动调节，并记住你的选择。
 - **阅读页**：排版后的正文、标题大纲、上一篇/下一篇，以及导出与分享入口。
 - **编辑页**：分栏 Markdown 编辑器，左侧写作、右侧实时预览并同步滚动。工具栏快捷插入标题、粗体、斜体、链接、引用、代码块、列表与表格；大纲面板可跳转到任意标题；图片可直接上传或粘贴插入。
 - **上传与导入页**：批量导入 `.md` 文件，逐文件给出结果，失败的原因会被说明而不是静默跳过。
@@ -49,7 +49,7 @@ MarkNest 不是又一个把内容锁进数据库的笔记服务。它把每一�
    - Intel / AMD：`marknest_<版本>_x86_64.deb`
    - ARM：`marknest_<版本>_aarch64.deb`
 2. 在 TOS 桌面打开**应用中心**，选择手动安装，上传对应的 `.deb`。
-3. 安装完成后，桌面出现 **MarkNest 笔记** 图标。
+3. 安装完成后，桌面出现 **MarkNest** 图标。
 
 同目录下的 `.sha256` 文件可用于校验下载完整性。
 
@@ -92,7 +92,7 @@ python tools/bump_version.py --bump patch
 python tools/validate.py        # 安装包、元数据与权限检查
 python tools/lang_stats.py      # 14 种语言元数据完整性
 python tools/bump_version.py --check
-node tools/webui_check.js       # 三语字典键一致性
+node tools/webui_check.js       # 九语字典键一致性
 python tools/verify_pages.py    # 无头浏览器逐页验收
 ```
 
@@ -100,7 +100,7 @@ python tools/verify_pages.py    # 无头浏览器逐页验收
 
 ## 语言
 
-界面提供简体中文、繁體中文与 English，默认跟随 TOS 的显示语言，并在 TOS 语言变化后自动切换；其余语言回退到 English。应用中心的名称、简介与更新说明提供 14 种语言。
+界面提供简体中文、繁體中文、English、日本語、한국어、Deutsch、Français、Español 与 Русский 九种语言，默认跟随 TOS 的显示语言，并在 TOS 语言变化后自动切换；其余语言回退到 English。应用中心的名称、简介与更新说明提供 14 种语言。
 
 ## 反馈
 

@@ -95,7 +95,6 @@
 
     var head = UI.el('div', { class: 'page-head' }, [
       UI.el('div', { class: 'page-head-text' }, [
-        UI.el('div', { class: 'eyebrow', text: I18N.t('nav.import') }),
         UI.el('h1', { class: 'page-title', text: I18N.t('import.title') }),
         UI.el('p', { class: 'page-sub', text: I18N.t('import.subtitle') })
       ]),
@@ -129,8 +128,7 @@
     right.appendChild(buildTextCreate());
 
     Shell.setCrumb([
-      { label: I18N.t('nav.library'), href: Router.href('library', {}) },
-      { label: I18N.t('nav.import') }
+      { label: I18N.t('nav.library'), href: Router.href('library', {}) }
     ]);
     Shell.setTitle(I18N.t('import.title'));
     Shell.setActions([

@@ -199,7 +199,8 @@ class StubApi:
             "notes": view["count"],
             "bytes": view["totals"]["bytes"],
             "folders": len(view["folders"]),
-            "versions": sum(len(items) for items in self.versions.values()),
+            "versions": (sum(len(items) for items in self.versions.values())
+                         if self.notes else 0),
             "attachments": False,
             "engine": "fts5",
             "last_indexed": _now_iso(),
@@ -534,6 +535,11 @@ def serve(directory=None):
     target = directory or WEBUI
 
     class Quiet(http.server.SimpleHTTPRequestHandler):
+        # Some Python builds resolve .svg to the non-standard "image/svg",
+        # which Chromium refuses to decode inside an <img>.
+        extensions_map = dict(http.server.SimpleHTTPRequestHandler.extensions_map)
+        extensions_map[".svg"] = "image/svg+xml"
+
         def __init__(self, *args, **kwargs):
             super().__init__(*args, directory=target, **kwargs)
 
