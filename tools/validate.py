@@ -1001,6 +1001,7 @@ def check_tools(report):
         "tools/measure_topbar.py",
         "tools/verify_error_i18n.py",
         "tools/verify_editor.py",
+        "tools/verify_pages.py",
         "tools/webui_build.py",
         "build.sh",
     )

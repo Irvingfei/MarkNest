@@ -29,15 +29,19 @@ A write target that is a symbolic link is refused outright rather than followed.
 Following it is how a write inside the library ends up outside it.
 """
 
-import errno
 import hashlib
 import os
+import secrets
 import stat
 import tempfile
+import time
 import unicodedata
 
 from .config import config
 from .errors import (
+    AttachmentNotFound,
+    AttachmentRejected,
+    FolderNotEmpty,
     LibraryNotWritable,
     LibraryUnavailable,
     NameInvalid,
@@ -47,6 +51,7 @@ from .errors import (
     PathDenied,
     PathInvalid,
 )
+from .history import history_store
 from .logging_setup import get_logger
 
 log = get_logger("library")
@@ -391,6 +396,24 @@ def _is_note(name):
     return name.lower().endswith(config.note_extensions)
 
 
+def _snapshot(user, rel, path):
+    """Record the current file as a revision before it is replaced.
+
+    A failure here is logged but never raised: losing one history entry is a
+    smaller problem than refusing a save the person asked for.
+    """
+    try:
+        st = os.stat(path)
+        if st.st_size > config.max_note_bytes:
+            return None
+        with open(path, "rb") as handle:
+            text, _bom = _decode(handle.read())
+        return history_store.record(user, rel, text, revision_of(path, stat_result=st))
+    except OSError as exc:
+        log.info("cannot snapshot %s/%s: %s", user, rel, exc)
+        return None
+
+
 # ------------------------------------------------------------------ writing
 
 
@@ -587,6 +610,7 @@ def save_note(user, rel, content, base_rev=None, eol="lf", force=False):
 
     data = _encode(content, eol, False)
     _check_size(data)
+    _snapshot(user, rel, path)
     try:
         atomic_write(path, data)
     except PermissionError:
@@ -628,7 +652,9 @@ def rename_note(user, src_rel, dst_rel, overwrite=False):
         log.warning("cannot rename %s -> %s: %s", src, dst, exc)
         raise LibraryNotWritable("the note could not be moved")
 
-    return read_note(user, _rel_of(dst, root_real))
+    target_rel = _rel_of(dst, root_real)
+    history_store.rename_path(user, src_rel, target_rel)
+    return read_note(user, target_rel)
 
 
 def delete_note(user, rel):
@@ -639,6 +665,7 @@ def delete_note(user, rel):
     if not os.path.isfile(path):
         raise NoteNotFound("the note does not exist")
     _require_writable_directory(os.path.dirname(path))
+    _snapshot(user, rel, path)
     try:
         os.unlink(path)
     except PermissionError:
@@ -647,6 +674,273 @@ def delete_note(user, rel):
         log.warning("cannot delete %s: %s", path, exc)
         raise LibraryNotWritable("the note could not be deleted")
     return {"path": rel, "deleted": True}
+
+
+# ------------------------------------------------------------------ folders
+
+
+def list_folders(user, limit=4000):
+    """Every folder in the user's library, root excluded.
+
+    The tree endpoint lists one level at a time, which is right for browsing but
+    wrong for a folder picker. This walks the whole library once, skipping the
+    same dot entries the tree and the indexer skip.
+    """
+    root = user_notes_root(user)
+    found = []
+    stack = [("", root, 0)]
+    while stack and len(found) < limit:
+        rel_dir, abs_dir, depth = stack.pop()
+        try:
+            with os.scandir(abs_dir) as entries:
+                for entry in entries:
+                    try:
+                        if entry.name.startswith(".") or not entry.is_dir(follow_symlinks=False):
+                            continue
+                    except OSError:
+                        continue
+                    rel = entry.name if not rel_dir else rel_dir + "/" + entry.name
+                    found.append({"path": rel, "name": entry.name, "depth": depth})
+                    if depth < 12:
+                        stack.append((rel, entry.path, depth + 1))
+        except OSError as exc:
+            log.info("cannot enumerate folders under %s: %s", abs_dir, exc)
+    found.sort(key=lambda item: item["path"].lower())
+    return found
+
+
+def delete_folder(user, rel):
+    """Remove an empty folder. Non-empty folders are refused, never recursive.
+
+    Recursive deletion is deliberately not offered: the files are the user's
+    own notes, and a mis-click in a tree that also contains folders created over
+    SMB should not be able to erase a subtree.
+    """
+    path, root = resolve_dir(user, rel)
+    if os.path.realpath(path) == os.path.realpath(root):
+        raise NameInvalid("the library root cannot be deleted")
+    if os.path.islink(path):
+        raise PathInvalid("the path is a symbolic link")
+    try:
+        with os.scandir(path) as entries:
+            for _entry in entries:
+                raise FolderNotEmpty("the folder is not empty")
+    except PermissionError:
+        raise PathDenied("the notes library refused access to that folder")
+    try:
+        os.rmdir(path)
+    except PermissionError:
+        raise LibraryNotWritable("that folder cannot be deleted")
+    except OSError as exc:
+        log.warning("cannot delete folder %s: %s", path, exc)
+        raise LibraryNotWritable("the folder could not be deleted")
+    return {"path": rel, "deleted": True}
+
+
+# --------------------------------------------------------------- version history
+
+
+def list_versions(user, rel, limit=None):
+    return history_store.list(user, rel, limit or config.version_keep)
+
+
+def read_version(user, rel, version_id):
+    return history_store.require(user, rel, version_id)
+
+
+def restore_version(user, rel, version_id):
+    """Write an earlier revision back, keeping the revision it replaces.
+
+    The current content is snapshotted by :func:`save_note` on the way in, so a
+    restore is itself reversible and never loses the state someone restored
+    away from.
+    """
+    version = history_store.require(user, rel, version_id)
+    note = save_note(
+        user,
+        rel,
+        version.get("content") or "",
+        base_rev=None,
+        eol=_detect_eol(version.get("content") or ""),
+        force=True,
+    )
+    note["restored_version"] = int(version["id"])
+    note["restored_at"] = version.get("created_at") or ""
+    return note
+
+
+# ------------------------------------------------------------------ attachments
+
+#: Content types accepted as images. Detection is by magic bytes rather than by
+#: the client's declared type or the file extension, because both are input.
+_IMAGE_TYPES = (
+    (b"\x89PNG\r\n\x1a\n", "png", "image/png"),
+    (b"\xff\xd8\xff", "jpg", "image/jpeg"),
+    (b"GIF87a", "gif", "image/gif"),
+    (b"GIF89a", "gif", "image/gif"),
+    (b"BM", "bmp", "image/bmp"),
+)
+
+_MIME_BY_EXT = {
+    "png": "image/png",
+    "jpg": "image/jpeg",
+    "gif": "image/gif",
+    "webp": "image/webp",
+    "bmp": "image/bmp",
+    "avif": "image/avif",
+}
+
+
+def _detect_image(head):
+    for magic, ext, mime in _IMAGE_TYPES:
+        if head.startswith(magic):
+            return ext, mime
+    if head[:4] == b"RIFF" and head[8:12] == b"WEBP":
+        return "webp", "image/webp"
+    if head[4:12] in (b"ftypavif", b"ftypavis"):
+        return "avif", "image/avif"
+    return None, ""
+
+
+def _safe_stem(filename):
+    base = os.path.basename((filename or "").replace("\\", "/"))
+    stem = os.path.splitext(base)[0]
+    stem = unicodedata.normalize("NFC", stem)
+    cleaned = "".join(
+        ch if (ch.isalnum() or ch in "-_") else "-" for ch in stem
+    ).strip("-_ ")
+    return (cleaned[:40] or "image")
+
+
+def _resolve_asset(user, rel):
+    """Resolve an attachment path, allowing the dot asset folder by name.
+
+    Ordinary note paths reject every dot-prefixed segment. Attachments live in
+    ``.assets`` on purpose, so that one segment is allowed here and nothing else
+    changes: no ``..``, no absolute path, and the realpath still has to stay
+    inside the user's library.
+    """
+    root = user_notes_root(user)
+    if not isinstance(rel, str) or not rel.strip():
+        raise AttachmentNotFound("the attachment does not exist")
+    text = rel.strip().replace("\\", "/")
+    if text.startswith("/") or "\x00" in text:
+        raise PathInvalid("the path must be relative to your notes library")
+    segments = []
+    seen_asset = False
+    for raw in text.split("/"):
+        if not raw or raw == ".":
+            continue
+        if raw == "..":
+            raise PathInvalid("the path must not contain '..'")
+        if raw == config.asset_dirname:
+            seen_asset = True
+            segments.append(raw)
+            continue
+        segments.append(validate_name(raw))
+    if not seen_asset:
+        raise PathInvalid("that path is not an attachment")
+    path, _root = _resolve_under(root, segments)
+    return path, _rel_of(path, os.path.realpath(root))
+
+
+def save_attachment(user, dir_rel, filename, source_path, size):
+    """Store one uploaded image beside the note's folder.
+
+    The name is generated rather than reused: an upload is untrusted input, and
+    two clients uploading ``image.png`` must not overwrite one another. The
+    original stem is kept for readability; a random suffix makes it unique.
+    """
+    if size and size > config.max_attachment_bytes:
+        raise NoteTooLarge(
+            "the image is larger than the %d MB limit"
+            % (config.max_attachment_bytes // (1024 * 1024))
+        )
+    with open(source_path, "rb") as handle:
+        head = handle.read(16)
+        handle.seek(0)
+        ext, mime = _detect_image(head)
+        if not ext:
+            raise AttachmentRejected("that file is not a supported image")
+        data = handle.read(config.max_attachment_bytes + 1)
+    if len(data) > config.max_attachment_bytes:
+        raise NoteTooLarge(
+            "the image is larger than the %d MB limit"
+            % (config.max_attachment_bytes // (1024 * 1024))
+        )
+
+    directory, root = resolve_dir(user, dir_rel)
+    assets = os.path.join(directory, config.asset_dirname)
+    if os.path.islink(assets):
+        raise PathInvalid("the asset folder is a symbolic link")
+    try:
+        os.makedirs(assets, exist_ok=True)
+    except OSError as exc:
+        log.warning("cannot create asset folder %s: %s", assets, exc)
+        raise LibraryNotWritable("the image could not be stored")
+
+    stem = _safe_stem(filename)
+    target = None
+    for _attempt in range(5):
+        name = "%s-%s.%s" % (stem, secrets.token_hex(4), ext)
+        candidate = os.path.join(assets, name)
+        if not os.path.exists(candidate):
+            target = candidate
+            break
+    if target is None:
+        raise LibraryNotWritable("the image could not be stored")
+
+    try:
+        atomic_write(target, data)
+    except OSError as exc:
+        log.warning("cannot write attachment %s: %s", target, exc)
+        raise LibraryNotWritable("the image could not be stored")
+
+    rel = _rel_of(target, root)
+    note_dir = _rel_of(directory, root)
+    relative = ("%s/%s" % (config.asset_dirname, os.path.basename(target)))
+    return {
+        "path": rel,
+        "name": os.path.basename(target),
+        "relative": relative,
+        "dir": note_dir,
+        "size": len(data),
+        "mime": mime or _MIME_BY_EXT.get(ext, "application/octet-stream"),
+        "markdown": "![%s](%s)" % (os.path.splitext(os.path.basename(filename or ""))[0] or "image", relative),
+    }
+
+
+def read_attachment(user, rel):
+    path, rel_norm = _resolve_asset(user, rel)
+    if os.path.islink(path):
+        raise PathInvalid("the attachment is a symbolic link")
+    if not os.path.isfile(path):
+        raise AttachmentNotFound("the attachment does not exist")
+    try:
+        st = os.stat(path)
+        if st.st_size > config.max_attachment_bytes:
+            raise NoteTooLarge("the attachment is too large")
+        with open(path, "rb") as handle:
+            data = handle.read()
+    except PermissionError:
+        raise PathDenied("the notes library refused access to that attachment")
+    ext = os.path.splitext(path)[1].lstrip(".").lower()
+    return {
+        "path": rel_norm,
+        "name": os.path.basename(path),
+        "size": len(data),
+        "mime": _MIME_BY_EXT.get(ext, "application/octet-stream"),
+        "data": data,
+    }
+
+
+# ----------------------------------------------------------------------- import
+
+
+def decode_upload(raw):
+    """Decode uploaded bytes into note text, returning ``(text, eol, bom)``."""
+    text, bom = _decode(raw if isinstance(raw, bytes) else bytes(raw or b""))
+    return text, _detect_eol(text), bom
 
 
 # ------------------------------------------------------------------ health

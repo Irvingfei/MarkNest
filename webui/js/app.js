@@ -1,305 +1,103 @@
-/* MarkNest for TOS - bootstrap and shell wiring.
+/* MarkNest for TOS - application entry point.
 
-   Two conventions carried over from the platform work that preceded this app,
-   both of which cost real debugging to learn:
+   Boot order matters in one respect: the shell paints before the first
+   request. The sidebar and the topbar are useful even while /library is still
+   loading, and a failed library read is then reported in the view that needs
+   it rather than as a blank frame.
 
-   Every boot stage is wrapped so that one failing subsystem cannot leave the
-   user looking at a blank frame. A missing element or a rejected promise used
-   to abort the rest of startup, and "white screen with no explanation" is the
-   least actionable failure an embedded application can produce.
-
-   The open note is kept in the URL fragment. There is no address bar inside the
-   iframe and the platform may reload the frame at any moment, so the fragment is
-   the only place that survives - without it, a reload silently returns the user
-   to an empty editor. */
+   Pages are plain objects registered with the router. A page owns the DOM
+   inside #view and nothing outside it. */
 
 (function (global) {
   'use strict';
 
-  var HEALTH_INTERVAL = 20000;
-  var healthTimer = null;
-  var options = {};
-
-  function step(label, fn) {
-    try {
-      return fn();
-    } catch (error) {
-      if (global.console && global.console.error) {
-        global.console.error('[marknest] boot step failed: %s', label, error);
-      }
-      return null;
-    }
-  }
-
-  function setStatus(text, kind) {
-    var node = document.getElementById('status-text');
-    if (!node) {
-      return;
-    }
-    node.textContent = text || '';
-    node.className = 'status' + (kind ? ' is-' + kind : '');
-  }
-
-  function setIndexStatus(text) {
-    var node = document.getElementById('index-status');
-    if (node) {
-      node.textContent = text || '';
-    }
-  }
-
-  function setDirty(flag) {
-    var dot = document.getElementById('dirty-dot');
-    var save = document.getElementById('btn-save');
-    if (dot) {
-      dot.hidden = !flag;
-    }
-    if (save) {
-      save.disabled = !flag;
-    }
-  }
-
-  function setTitle(path) {
-    var node = document.getElementById('current-path');
-    if (node) {
-      node.textContent = path || I18N.t('editor.noNote');
-    }
-  }
-
-  /* ----------------------------------------------------------------- health */
-
-  function health() {
-    return API.getHealth().then(function (payload) {
-      var ready = payload && payload.library_ready;
-      setStatus(ready ? I18N.t('status.libraryOk') : I18N.t('status.libraryDown'),
-        ready ? '' : 'is-bad');
-      var index = (payload && payload.index) || {};
-      setIndexStatus(I18N.t('status.indexed', { n: index.notes || 0 }));
-      return payload;
-    }).catch(function (error) {
-      setStatus(I18N.errorText(error), 'is-bad');
-      setIndexStatus('');
-      return null;
-    });
-  }
-
-  function startHealthPolling() {
-    health();
-    if (healthTimer) {
-      global.clearInterval(healthTimer);
-    }
-    healthTimer = global.setInterval(health, HEALTH_INTERVAL);
-  }
-
-  /* ----------------------------------------------------------------- layout */
-
-  function applyWidth() {
-    var workspace = document.getElementById('workspace');
-    if (!workspace) {
-      return;
-    }
-    var width = workspace.clientWidth;
-    // Collapse progressively rather than squeezing three panes into a frame
-    // that cannot hold them. Below 900px the preview goes; below 640px the
-    // tree goes with it.
-    workspace.classList.toggle('is-no-preview', width < 900 || !options.preview);
-    workspace.classList.toggle('is-no-tree', width < 640);
-  }
-
-  function togglePreview() {
-    options.preview = !options.preview;
-    var button = document.getElementById('btn-preview-toggle');
-    if (button) {
-      button.setAttribute('aria-pressed', options.preview ? 'true' : 'false');
-      button.classList.toggle('is-active', options.preview);
-    }
-    applyWidth();
-  }
-
-  /* ------------------------------------------------------------------ route */
-
-  function pageFromHash() {
-    var raw = (global.location.hash || '').replace(/^#\/?/, '');
-    var queryStart = raw.indexOf('?');
-    var params = {};
-    if (queryStart !== -1) {
-      raw.slice(queryStart + 1).split('&').forEach(function (pair) {
-        if (!pair) {
-          return;
-        }
-        var split = pair.indexOf('=');
-        var key = split === -1 ? pair : pair.slice(0, split);
-        var value = split === -1 ? '' : pair.slice(split + 1);
-        try {
-          params[decodeURIComponent(key)] = decodeURIComponent(value);
-        } catch (error) {
-          params[key] = value;
-        }
-      });
-      raw = raw.slice(0, queryStart);
-    }
-    return { page: raw || 'notes', params: params };
-  }
-
-  function writeHash(path) {
-    var next = '#/notes' + (path ? '?p=' + encodeURIComponent(path) : '');
-    if (global.location.hash !== next) {
-      global.location.hash = next;
-    }
-  }
-
-  function openNote(path, push) {
-    setTitle(path);
-    if (global.TreePane) {
-      global.TreePane.setCurrent(path);
-    }
-    if (push) {
-      writeHash(path);
-    }
-    return global.EditorPane.open(path);
-  }
-
-  /* ------------------------------------------------------------------- boot */
-
-  function bindShell() {
-    var newButton = document.getElementById('btn-new-note');
-    if (newButton) {
-      newButton.addEventListener('click', function () {
-        global.TreePane.newNote();
-      });
-    }
-
-    var saveButton = document.getElementById('btn-save');
-    if (saveButton) {
-      saveButton.addEventListener('click', function () {
-        global.EditorPane.save();
-      });
-    }
-
-    var previewButton = document.getElementById('btn-preview-toggle');
-    if (previewButton) {
-      previewButton.addEventListener('click', togglePreview);
-    }
-
-    var refresh = document.getElementById('btn-refresh-tree');
-    if (refresh) {
-      refresh.addEventListener('click', function () {
-        global.TreePane.reload();
-      });
-    }
-
-    var langSelect = document.getElementById('lang-select');
-    if (langSelect) {
-      I18N.supported.forEach(function (tag) {
-        var option = document.createElement('option');
-        option.value = tag;
-        option.textContent = tag;
-        langSelect.appendChild(option);
-      });
-      langSelect.value = I18N.getLanguage();
-      langSelect.addEventListener('change', function () {
-        I18N.setLanguage(langSelect.value);
-        // The panes render text themselves, so their current content has to be
-        // produced again for the new language to appear in it.
-        I18N.apply(document);
-        if (global.TreePane) {
-          global.TreePane.render();
-        }
-        if (global.EditorPane && global.EditorPane.editor()) {
-          global.PreviewPane.render(global.EditorPane.editor().getValue());
-        }
-        health();
-      });
-    }
-
-    applyWidth();
-    global.addEventListener('resize', applyWidth);
-
-    // A note with unsaved changes is the one thing a reload would silently
-    // destroy, so the browser is asked to confirm.
-    global.addEventListener('beforeunload', function (event) {
-      if (global.EditorPane && global.EditorPane.isDirty()) {
-        event.preventDefault();
-        event.returnValue = '';
-        return '';
-      }
-      return undefined;
-    });
-
-    global.addEventListener('hashchange', function () {
-      var route = pageFromHash();
-      if (route.page === 'notes' && route.params.p !== global.TreePane.current()) {
-        openNote(route.params.p || '', false);
-      }
-    });
-  }
+  var started = false;
 
   function boot() {
-    options.preview = true;
+    if (started) {
+      return;
+    }
+    started = true;
 
-    step('language', function () {
-      I18N.setLanguage(I18N.getLanguage());
-    });
+    if (Store.settings.get('language')) {
+      I18N.setLanguage(Store.settings.get('language'));
+    } else {
+      Store.settings.set('language', I18N.getLanguage());
+    }
 
-    step('shell', bindShell);
+    Shell.init();
 
-    step('tree', function () {
-      global.TreePane.init({
-        onOpen: function (path) {
-          openNote(path, true);
-        }
-      });
-    });
+    var routes = {
+      library: Pages.library,
+      read: Pages.reader,
+      edit: Pages.editor,
+      import: Pages.importer,
+      settings: Pages.settings
+    };
 
-    step('editor', function () {
-      global.EditorPane.init({
-        onDirty: setDirty,
-        onSaved: function () {
-          global.TreePane.refresh();
-        }
-      });
-    });
-
-    step('preview', function () {
-      global.PreviewPane.init();
-      var button = document.getElementById('btn-preview-toggle');
-      if (button) {
-        button.classList.add('is-active');
+    Store.loadCore().then(function () {
+      var version = Store.state.health && Store.state.health.version;
+      var badge = global.document.getElementById('app-version');
+      if (badge && version) {
+        badge.textContent = 'v' + version;
       }
+      Shell.sync();
+      return Store.loadLibraryAndStats().then(function () {
+        Shell.sync();
+      }, function () {
+        // The library page owns the error surface; the shell still works.
+        Shell.sync();
+      });
+    }).catch(function (error) {
+      Shell.sync();
+      UI.toast((error && error.message) || I18N.t('err.network'), 'bad');
+    }).then(function () {
+      if (!global.location.hash) {
+        var preferred = Store.settings.get('defaultPage') || 'library';
+        if (!routes[preferred]) {
+          preferred = 'library';
+        }
+        try {
+          global.location.replace(Router.href(preferred, {}));
+        } catch (error) {
+          global.location.hash = Router.href(preferred, {});
+        }
+      }
+      Router.start(routes, global.document.getElementById('view'));
     });
 
-    step('search', function () {
-      global.SearchPane.init({
-        onOpen: function (path) {
-          openNote(path, true);
-        },
-        onExit: function () {
-          global.TreePane.render();
-        }
-      });
-    });
-
-    step('health', startHealthPolling);
-
-    step('tree-load', function () {
-      global.TreePane.reload().then(function () {
-        var route = pageFromHash();
-        if (route.params.p) {
-          openNote(route.params.p, false);
-        }
-      });
+    global.addEventListener('unhandledrejection', function (event) {
+      var reason = event.reason;
+      if (reason && reason.name === 'ApiError') {
+        return;
+      }
+      if (global.console) {
+        global.console.error(reason);
+      }
     });
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', boot);
-  } else {
-    boot();
+  function health() {
+    return Store.state.health;
+  }
+
+  function openNote(path) {
+    if (!path) {
+      Router.navigate('library');
+      return;
+    }
+    Router.navigate('read', { p: path });
   }
 
   global.App = {
     boot: boot,
     health: health,
-    openNote: openNote,
-    options: function () { return options; }
+    openNote: openNote
   };
+
+  if (global.document.readyState === 'loading') {
+    global.document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
+  }
 })(window);

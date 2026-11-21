@@ -22,11 +22,17 @@ const ORDER = [
   'js/i18n.js',
   'js/ui.js',
   'js/api.js',
+  'js/store.js',
+  'js/router.js',
+  'js/render.js',
   'js/toshost.js',
-  'js/treepane.js',
-  'js/editorpane.js',
-  'js/previewpane.js',
-  'js/searchpane.js',
+  'js/shell.js',
+  'js/pages/doc.js',
+  'js/pages/library.js',
+  'js/pages/reader.js',
+  'js/pages/editor.js',
+  'js/pages/importer.js',
+  'js/pages/settings.js',
   'js/app.js'
 ];
 
@@ -39,6 +45,20 @@ const VENDOR = 'js/vendor.editor.js';
 const VENDOR_SURFACE = ['create', 'render'];
 
 /* --------------------------------------------------------------- DOM stub */
+
+function makeClassList() {
+  const names = new Set();
+  return {
+    add(...items) { items.forEach((item) => names.add(item)); },
+    remove(...items) { items.forEach((item) => names.delete(item)); },
+    toggle(item, force) {
+      const on = force === undefined ? !names.has(item) : !!force;
+      if (on) { names.add(item); } else { names.delete(item); }
+      return on;
+    },
+    contains(item) { return names.has(item); }
+  };
+}
 
 function makeElement(tag) {
   const el = {
@@ -57,9 +77,15 @@ function makeElement(tag) {
     checked: false,
     disabled: false,
     files: [],
+    scrollTop: 0,
+    scrollHeight: 600,
+    clientHeight: 600,
+    offsetHeight: 600,
+    offsetWidth: 600,
+    offsetParent: {},
     parentNode: null,
     firstChild: null,
-    classList: { add() {}, remove() {}, contains() { return false; } },
+    classList: makeClassList(),
     setAttribute(k, v) { this.attributes[k] = String(v); },
     getAttribute(k) { return Object.prototype.hasOwnProperty.call(this.attributes, k) ? this.attributes[k] : null; },
     hasAttribute(k) { return Object.prototype.hasOwnProperty.call(this.attributes, k); },
@@ -93,19 +119,26 @@ function makeElement(tag) {
   return el;
 }
 
+const byId = {};
 const documentStub = {
   readyState: 'complete',
   documentElement: makeElement('html'),
   body: makeElement('body'),
+  activeElement: null,
   hidden: false,
   createElement: makeElement,
+  createElementNS(namespace, tag) { return makeElement(tag); },
   createTextNode(text) { return { nodeType: 3, textContent: String(text), parentNode: null }; },
-  getElementById() { return null; },
+  getElementById(id) {
+    if (!byId[id]) { byId[id] = makeElement('div'); }
+    return byId[id];
+  },
   querySelector() { return null; },
   querySelectorAll() { return []; },
   addEventListener() {},
   removeEventListener() {}
 };
+documentStub.activeElement = documentStub.body;
 
 const storage = {};
 const localStorageStub = {
@@ -134,6 +167,19 @@ const sandbox = {
   clearTimeout,
   setInterval() { return 1; },
   clearInterval() {},
+  addEventListener() {},
+  removeEventListener() {},
+  innerWidth: 1280,
+  innerHeight: 800,
+  matchMedia() { return { matches: false, addEventListener() {}, removeEventListener() {} }; },
+  print() {},
+  /* Every request fails immediately in the stub. Pages mount synchronously and
+     render their error surface; nothing here waits on the network. */
+  fetch() { return Promise.reject(new Error('network disabled in the DOM stub')); },
+  AbortController: function AbortControllerStub() {
+    this.signal = { aborted: false };
+    this.abort = function () { this.signal.aborted = true; };
+  },
   Promise,
   Object,
   Array,
@@ -194,8 +240,8 @@ for (const rel of ORDER) {
 /* -------------------------------------------------------- collect exports */
 
 const MODULES = {};
-for (const name of ['UI', 'I18N', 'API', 'TreePane', 'EditorPane', 'PreviewPane',
-                    'SearchPane', 'App', 'TosHost']) {
+for (const name of ['UI', 'I18N', 'API', 'ApiError', 'Store', 'Router', 'Render',
+                    'Shell', 'Pages', 'App', 'TosHost']) {
   const value = sandbox[name];
   if (value && (typeof value === 'object' || typeof value === 'function')) {
     MODULES[name] = new Set(Object.keys(value));
@@ -240,12 +286,12 @@ if (!i18nTables) {
 /* ------------------------------------------------- scan call sites for typos */
 
 const ALLOWED_GLOBALS = new Set([
-  'UI', 'I18N', 'API', 'TreePane', 'EditorPane', 'PreviewPane', 'SearchPane',
+  'UI', 'I18N', 'API', 'Store', 'Router', 'Render', 'Shell', 'Pages',
   'App', 'TosHost', 'MDEditor',
   'window', 'document', 'navigator', 'localStorage', 'console', 'Math', 'JSON',
   'Object', 'Array', 'String', 'Number', 'Boolean', 'Date', 'RegExp', 'Promise',
   'Error', 'TypeError', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval',
-  'XMLHttpRequest', 'FormData', 'URL', 'Blob'
+  'XMLHttpRequest', 'FormData', 'URL', 'Blob', 'AbortController'
 ]);
 
 const callPattern = /\b([A-Z][A-Za-z0-9_]*)\.([A-Za-z_$][A-Za-z0-9_$]*)\s*\(/g;
@@ -292,19 +338,30 @@ for (const rel of loaded) {
  * and `API.getJobStats`, which never existed (statistics arrive inside the
  * `stats` field of `GET /jobs`). */
 const REQUIRED = {
-  UI: ['el', 'clear', 'show', 'hide', 'toast', 'loading', 'empty', 'errorBox',
-       'hintNode', 'skeleton', 'badge', 'statusBadge', 'formatBytes',
-       'formatDateTime', 'escapeHtml', 'debounce'],
+  UI: ['el', 'icon', 'clear', 'show', 'hide', 'toast', 'loading', 'empty',
+       'emptyState', 'errorBox', 'hintNode', 'skeleton', 'badge', 'statusBadge',
+       'modal', 'confirm', 'promptDialog', 'menu', 'copyText', 'download',
+       'formatBytes', 'formatDateTime', 'formatDate', 'formatTimeAgo',
+       'escapeHtml', 'debounce', 'clamp'],
   I18N: ['t', 'errorText', 'apply', 'setLanguage', 'getLanguage', 'detect',
-         'supported'],
-  API: ['getHealth', 'getOptions', 'getMe', 'getTree', 'getNote', 'saveNote',
-        'createNote', 'renameNote', 'deleteNote', 'search', 'indexStatus',
-        'indexScan'],
-  TreePane: ['init', 'reload', 'refresh', 'newNote', 'setCurrent', 'render',
-             'current'],
-  EditorPane: ['init', 'open', 'save', 'isDirty', 'currentPath', 'editor'],
-  PreviewPane: ['init', 'render', 'schedule', 'setEnabled'],
-  SearchPane: ['init', 'run', 'exit', 'isActive'],
+         'supported', 'tables'],
+  API: ['getHealth', 'getOptions', 'getMe', 'getLibrary', 'getStats', 'getFolders',
+        'createFolder', 'deleteFolder', 'getTree', 'getNote', 'saveNote',
+        'createNote', 'renameNote', 'deleteNote', 'importNotes', 'uploadAttachment',
+        'attachmentBlob', 'getVersions', 'getVersion', 'restoreVersion', 'search',
+        'indexStatus', 'indexScan'],
+  Store: ['settings', 'applyAppearance', 'state', 'loadCore', 'loadLibrary',
+          'loadStats', 'loadLibraryAndStats', 'noteByPath', 'folderCount',
+          'assetUrl', 'releaseAssets'],
+  Router: ['start', 'parse', 'href', 'navigate', 'refresh', 'current', 'setGuard',
+           'clearGuard', 'onChange'],
+  Render: ['markdown', 'outline', 'titleOf', 'folderOf', 'baseName', 'stemOf',
+           'resolveAsset', 'hydrateImages', 'countWords', 'readingMinutes',
+           'inlineHtml', 'exportHtml'],
+  Shell: ['init', 'sync', 'setCrumb', 'setActions', 'setTitle', 'renderFolders',
+          'renderStorage', 'folderCrumb', 'createFolderFlow', 'openPalette',
+          'applyLanguage', 'toggleTheme', 'reportError', 'setMenuOpen'],
+  Pages: ['doc', 'library', 'reader', 'editor', 'importer', 'settings'],
   TosHost: ['canOpenSharedFolders', 'openSharedFolders'],
   App: ['boot', 'health', 'openNote']
 };

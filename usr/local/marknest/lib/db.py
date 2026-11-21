@@ -237,6 +237,40 @@ class IndexStore:
         except sqlite3.Error:
             return None
 
+    def list_notes(self, user, limit=2000):
+        """Flat listing for the library page, newest first.
+
+        Only a prefix of the body is selected: the list needs a one-line
+        excerpt, and dragging every note's full text through the socket just to
+        render a card is the kind of cost that only shows up once a library has
+        a few thousand notes.
+        """
+        conn = self._connect()
+        try:
+            rows = conn.execute(
+                "SELECT rel_path, title, size_bytes, mtime_ns, indexed_at, "
+                "       substr(body, 1, 600) AS excerpt "
+                "FROM notes WHERE user=? ORDER BY mtime_ns DESC LIMIT ?",
+                (user, int(limit)),
+            ).fetchall()
+        except sqlite3.Error as exc:
+            log.warning("cannot list notes for %s: %s", user, exc)
+            raise IndexUnavailable("the search index could not be read")
+        return [dict(row) for row in rows]
+
+    def totals(self, user):
+        conn = self._connect()
+        try:
+            row = conn.execute(
+                "SELECT COUNT(*) AS notes, COALESCE(SUM(size_bytes), 0) AS bytes "
+                "FROM notes WHERE user=?",
+                (user,),
+            ).fetchone()
+        except sqlite3.Error:
+            return {"notes": 0, "bytes": 0}
+        return {"notes": int(row["notes"]) if row else 0,
+                "bytes": int(row["bytes"]) if row else 0}
+
     # -------------------------------------------------------------------- search
 
     def search(self, user, query, limit=50):

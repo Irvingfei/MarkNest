@@ -12,7 +12,11 @@
    Two endpoints answer without a resolved user - /health and /options - because
    they describe the installation rather than anybody's notes. Everything else
    needs the TOS user, which the backend reads from a cookie it treats as
-   untrusted input. */
+   untrusted input.
+
+   Uploads are sent with XMLHttpRequest rather than fetch for one reason: an
+   import of thirty files is slow enough that the difference between a spinner
+   and a progress bar is the difference between "broken" and "working". */
 
 (function (global) {
   'use strict';
@@ -126,6 +130,7 @@
     this.code = opts.code || 0;
     this.kind = opts.kind || 'api';
     this.retryable = opts.retryable !== false;
+    this.payload = opts.payload || null;
     if (Error.captureStackTrace) {
       Error.captureStackTrace(this, ApiError);
     } else {
@@ -156,13 +161,21 @@
     }
     if (payload && typeof payload.code === 'number' && payload.code !== 0) {
       throw new ApiError(I18N.errorText({ code: payload.code, message: payload.message }), {
-        status: status, code: payload.code
+        status: status, code: payload.code, payload: payload
       });
     }
     if (status >= 400) {
       throw new ApiError(I18N.t('err.http', { status: status }), { status: status });
     }
     return payload;
+  }
+
+  function parseBody(text) {
+    try {
+      return text ? JSON.parse(text) : null;
+    } catch (error) {
+      return null;
+    }
   }
 
   function request(path, options) {
@@ -178,12 +191,7 @@
     }).then(function (response) {
       guard.cancel();
       return response.text().then(function (text) {
-        var payload = null;
-        try {
-          payload = text ? JSON.parse(text) : null;
-        } catch (error) {
-          payload = null;
-        }
+        var payload = parseBody(text);
         var checked = handleStatus(response.status, payload);
         if (checked && typeof checked === 'object' && 'data' in checked) {
           return checked.data;
@@ -199,6 +207,96 @@
         throw new ApiError(I18N.t('err.timeout'), { kind: 'timeout' });
       }
       throw new ApiError(I18N.t('err.network'), { kind: 'network' });
+    });
+  }
+
+  /* Binary read for attachments. The bytes sit behind the same authenticated
+     proxy as everything else, so they cannot be put in an <img src> directly:
+     the request has to carry the platform headers. The caller turns the Blob
+     into an object URL and revokes it when the view goes away. */
+  function requestBlob(path, options) {
+    var opts = options || {};
+    var guard = withTimeout(opts.timeout || 60);
+    return fetch(BASE + path, {
+      method: 'GET',
+      credentials: 'include',
+      cache: 'no-store',
+      headers: authHeaders(opts.headers),
+      signal: guard.signal
+    }).then(function (response) {
+      guard.cancel();
+      if (!response.ok) {
+        return response.text().then(function (text) {
+          handleStatus(response.status, parseBody(text));
+          throw new ApiError(I18N.t('err.http', { status: response.status }), { status: response.status });
+        });
+      }
+      var type = response.headers.get('Content-Type') || '';
+      if (type.indexOf('application/json') !== -1) {
+        return response.text().then(function (text) {
+          handleStatus(200, parseBody(text));
+          throw new ApiError(I18N.t('err.http', { status: 200 }), { status: 200 });
+        });
+      }
+      return response.blob();
+    }, function (error) {
+      guard.cancel();
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      if (error && error.name === 'AbortError') {
+        throw new ApiError(I18N.t('err.timeout'), { kind: 'timeout' });
+      }
+      throw new ApiError(I18N.t('err.network'), { kind: 'network' });
+    });
+  }
+
+  /* Multipart upload with progress. `onProgress` receives 0..1 fractions of
+     bytes sent; the server's per-file verdicts arrive in the JSON body, so the
+     promise resolves with the same `data` envelope a fetch would have given. */
+  function upload(path, formData, options) {
+    var opts = options || {};
+    return new Promise(function (resolve, reject) {
+      var xhr = new global.XMLHttpRequest();
+      xhr.open('POST', BASE + path, true);
+      xhr.withCredentials = true;
+      var headers = authHeaders({});
+      Object.keys(headers).forEach(function (key) {
+        try {
+          xhr.setRequestHeader(key, headers[key]);
+        } catch (error) {
+          /* the custom Cookie header is refused outside the proxy host */
+        }
+      });
+      if (xhr.upload && typeof opts.onProgress === 'function') {
+        xhr.upload.addEventListener('progress', function (event) {
+          if (event.lengthComputable && event.total) {
+            opts.onProgress(event.loaded / event.total);
+          }
+        });
+      }
+      xhr.addEventListener('load', function () {
+        var payload = parseBody(xhr.responseText);
+        try {
+          if (xhr.status === 401) {
+            handleStatus(401, payload);
+          }
+          if (!xhr.status) {
+            throw new ApiError(I18N.t('err.network'), { kind: 'network' });
+          }
+          var checked = handleStatus(xhr.status, payload);
+          resolve(checked && typeof checked === 'object' && 'data' in checked ? checked.data : checked);
+        } catch (error) {
+          reject(error);
+        }
+      });
+      xhr.addEventListener('error', function () {
+        reject(new ApiError(I18N.t('err.network'), { kind: 'network' }));
+      });
+      xhr.addEventListener('abort', function () {
+        reject(new ApiError(I18N.t('err.timeout'), { kind: 'timeout' }));
+      });
+      xhr.send(formData);
     });
   }
 
@@ -243,6 +341,26 @@
       return request('/me');
     },
 
+    getLibrary: function (limit) {
+      return request('/library' + queryString({ limit: limit }));
+    },
+
+    getStats: function () {
+      return request('/stats');
+    },
+
+    getFolders: function () {
+      return request('/folders');
+    },
+
+    createFolder: function (path) {
+      return postJson('/folders/new', { path: path });
+    },
+
+    deleteFolder: function (path) {
+      return request('/folders' + queryString({ path: path }), { method: 'DELETE' });
+    },
+
     getTree: function (path) {
       return request('/tree' + queryString({ path: path }));
     },
@@ -265,6 +383,43 @@
 
     deleteNote: function (path) {
       return request('/notes' + queryString({ path: path }), { method: 'DELETE' });
+    },
+
+    importNotes: function (options) {
+      var opts = options || {};
+      var form = new global.FormData();
+      form.append('dir', opts.dir || '');
+      form.append('conflict', opts.conflict === 'skip' ? 'skip' : 'rename');
+      (opts.files || []).forEach(function (entry) {
+        form.append('relative', entry.relative || entry.file.name);
+        form.append('file', entry.file, entry.file.name);
+      });
+      return upload('/notes/import', form, { onProgress: opts.onProgress });
+    },
+
+    uploadAttachment: function (options) {
+      var opts = options || {};
+      var form = new global.FormData();
+      form.append('file', opts.file, opts.file.name);
+      return upload('/attachments' + queryString({ dir: opts.dir }), form, {
+        onProgress: opts.onProgress
+      });
+    },
+
+    attachmentBlob: function (path) {
+      return requestBlob('/attachments' + queryString({ path: path }), { timeout: 60 });
+    },
+
+    getVersions: function (path) {
+      return request('/versions' + queryString({ path: path }));
+    },
+
+    getVersion: function (path, id) {
+      return request('/versions/item' + queryString({ path: path, id: id }));
+    },
+
+    restoreVersion: function (path, id) {
+      return postJson('/versions/restore', { path: path, id: id });
     },
 
     search: function (q, limit) {

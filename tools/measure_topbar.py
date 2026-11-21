@@ -18,11 +18,9 @@ that still reserves those regions, and it also catches the failure mode this
 file exists for, which is a container that is *mostly* clear with one control
 peeking into the band.
 
-The earlier defect that produced this approach had two halves: a toolbar whose
-gutter was guessed from a screenshot (48-98px guessed, 141px actual), and a
-single element that stretched to the right edge under the host's window buttons.
-Measuring the host stylesheet fixed the first; asserting intersection fixes the
-second.
+Every page is scanned, not just the editor: the library toolbar, the import
+dropzone and the settings switches are all ordinary flex layouts that can drift
+into the bottom strip when a grid wraps at a narrow width.
 
 Usage:
     <python> tools/measure_topbar.py
@@ -46,6 +44,17 @@ GRIP = 18
 #: Frame widths to scan. The narrow ones are where a layout wraps and a control
 #: that was clear at 1180 suddenly is not.
 WIDTHS = [1180, 1024, 900, 820, 760, 700, 640, 600]
+
+#: Every route, with the marker that proves the page has actually mounted. An
+#: empty frame has no controls, so scanning before the mount would pass by
+#: saying nothing.
+PAGES = [
+    ("library", "#/library", ".page-library .note-card"),
+    ("reader", "#/read?p=welcome.md", ".page-reader .prose h1"),
+    ("editor", "#/edit?p=welcome.md", ".page-editor .cm-content"),
+    ("import", "#/import", ".page-import .dropzone"),
+    ("settings", "#/settings", ".page-settings .settings-grid"),
+]
 
 failures = []
 
@@ -119,6 +128,12 @@ def intersects(a, b):
                 a["bottom"] <= b["top"] or a["top"] >= b["bottom"])
 
 
+def open_page(page, route, marker):
+    page.evaluate("(hash) => { location.hash = hash; }", route)
+    page.wait_for_selector(marker, timeout=8000)
+    page.wait_for_timeout(450)
+
+
 def main():
     httpd, port = H.serve()
     url = "http://127.0.0.1:%d/index.html" % port
@@ -132,44 +147,51 @@ def main():
             context.route(H.PROXY_GLOB, H.make_router(state))
             page = context.new_page()
             H.boot_page(page, url)
+            page.wait_for_selector(".page-library .note-card", timeout=8000)
 
-            # Open a note so the editor, the preview and their footers are all
-            # populated; an empty layout is not the layout.
-            page.click('.tree-row:has(.tree-name:text-is("welcome.md"))')
-            page.wait_for_timeout(700)
-
-            print("Scanning %d widths for controls inside the host's regions" % len(WIDTHS))
+            print("Scanning %d pages x %d widths for controls inside the host's regions"
+                  % (len(PAGES), len(WIDTHS)))
             print("-" * 62)
-            for width in WIDTHS:
-                page.set_viewport_size({"width": width, "height": 720})
-                page.wait_for_timeout(350)
-                elements = page.evaluate(SCAN_JS)
-                zones = reserved(width, 720)
-                intrusions = []
-                for item in elements:
-                    for name, zone in zones:
-                        if intersects(item["box"], zone):
-                            intrusions.append("%s %r" % (item["tag"], item["label"]))
-                            break
-                check("%4dpx: %2d interactive element(s), 0 in a host region"
-                      % (width, len(elements)), not intrusions,
-                      intrusions[:4])
+            for route_name, route, marker in PAGES:
+                open_page(page, route, marker)
+                for width in WIDTHS:
+                    page.set_viewport_size({"width": width, "height": 720})
+                    page.wait_for_timeout(320)
+                    elements = page.evaluate(SCAN_JS)
+                    zones = reserved(width, 720)
+                    intrusions = []
+                    for item in elements:
+                        for name, zone in zones:
+                            if intersects(item["box"], zone):
+                                intrusions.append("%s %r in %s"
+                                                  % (item["tag"], item["label"], name))
+                                break
+                    check("%-8s %4dpx: %2d control(s), 0 in a host region"
+                          % (route_name, width, len(elements)), not intrusions,
+                          intrusions[:4])
 
             # The rule is not "the band is exactly 46px" but "nothing is in it",
-            # yet the top bar's own content still has to start below it or the
-            # band would be painted over by the application's own background.
+            # yet the shell's own content still has to start below the band or
+            # the band would be painted over by the application's background.
             page.set_viewport_size({"width": WIDTHS[0], "height": 720})
+            open_page(page, "#/library", ".page-library .note-card")
             page.wait_for_timeout(300)
             brand_top = page.evaluate(
                 "() => document.querySelector('.brand').getBoundingClientRect().top")
-            check("the top bar's content starts below the drag band (%.0f >= %d)"
+            check("the sidebar brand starts below the drag band (%.0f >= %d)"
                   % (brand_top, BAND_TOP), brand_top >= BAND_TOP)
 
-            status_bottom = page.evaluate(
-                "() => window.innerHeight - document.querySelector('.statusbar')"
+            topbar = page.evaluate(
+                "() => { var r = document.querySelector('.topbar').getBoundingClientRect();"
+                " return { top: r.top, bottom: r.bottom }; }")
+            check("the topbar itself clears the drag band (%.0f >= %d)"
+                  % (topbar["top"], BAND_TOP), topbar["top"] >= BAND_TOP)
+
+            foot_gap = page.evaluate(
+                "() => window.innerHeight - document.querySelector('.side-foot')"
                 ".getBoundingClientRect().bottom")
-            check("the status line leaves the bottom strip free",
-                  status_bottom <= BAND_BOTTOM + 0.5, status_bottom)
+            check("the sidebar footer leaves the bottom strip free (%.0f >= %d)"
+                  % (foot_gap, BAND_BOTTOM), foot_gap >= BAND_BOTTOM - 0.5)
 
             browser.close()
     finally:
@@ -181,8 +203,8 @@ def main():
         print("FAILED: %s" % ", ".join(failures))
         return 1
     print("PASSED: no interactive control enters the host's top band, bottom strip")
-    print("        or resize grip, at any width from %d to %d."
-          % (WIDTHS[-1], WIDTHS[0]))
+    print("        or resize grip on any of the five pages, at any width from")
+    print("        %d to %d." % (WIDTHS[-1], WIDTHS[0]))
     return 0
 
 

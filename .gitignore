@@ -12,6 +12,9 @@ webui-src/node_modules/
 # Working files from device sessions: screenshots, captured command output.
 /_scratch/
 
+# Local demo library created by tools/serve_dev_tcp.py.
+/.devdata/
+
 # Python
 __pycache__/
 *.py[cod]

@@ -29,6 +29,7 @@ from .config import config
 from .errors import BadRequest, MarkNestError
 from .http_util import (
     ClientDisconnected,
+    RawResponse,
     Request,
     encode_response,
     parse_request_line,
@@ -100,6 +101,7 @@ class ConnectionHandler(threading.Thread):
                 request = Request(method, target, version, headers, reader)
                 close = not _wants_keep_alive(request)
                 started = time.time()
+                raw = None
 
                 try:
                     status, payload = api.dispatch(request)
@@ -116,8 +118,14 @@ class ConnectionHandler(threading.Thread):
                     status = 500
                     payload = {"code": 1000, "message": "internal error", "data": None}
                 else:
+                    raw = payload if isinstance(payload, RawResponse) else None
+                    if raw is not None:
+                        status = raw.status
                     elapsed_ms = (time.time() - started) * 1000.0
-                    if status == 204 or payload is None:
+                    if raw is not None:
+                        log.info("%s %s -> %s (%.0f ms, %d bytes)",
+                                 method, target, status, elapsed_ms, len(raw.body))
+                    elif status == 204 or payload is None:
                         log.info("%s %s -> %s (%.0f ms)", method, target, status, elapsed_ms)
                     else:
                         payload = wrap_success(payload)
@@ -127,7 +135,12 @@ class ConnectionHandler(threading.Thread):
                     close = True
 
                 try:
-                    self._write(status, payload, close=close)
+                    if raw is not None:
+                        self._write(status, None, close=close, body=raw.body,
+                                    content_type=raw.content_type,
+                                    extra_headers=raw.headers)
+                    else:
+                        self._write(status, payload, close=close)
                 except (BrokenPipeError, ConnectionResetError, OSError):
                     return
 
@@ -144,16 +157,21 @@ class ConnectionHandler(threading.Thread):
             except Exception:
                 pass
 
-    def _write(self, status, payload, close=False):
+    def _write(self, status, payload, close=False, body=None, content_type=None,
+               extra_headers=None):
         extra = {}
         if status in (204, 401):
             extra.update(cors_headers())
+        if extra_headers:
+            extra.update(extra_headers)
         if close:
             extra["Connection"] = "close"
         else:
             extra["Connection"] = "keep-alive"
             extra["Keep-Alive"] = "timeout=%d" % int(config.idle_timeout)
-        self.connection.sendall(encode_response(status, payload, extra_headers=extra))
+        self.connection.sendall(encode_response(
+            status, payload, extra_headers=extra, body=body, content_type=content_type
+        ))
 
 
 def _wants_keep_alive(request):

@@ -113,6 +113,21 @@ class Config:
         self.hash_max_bytes = int(env("MARKNEST_HASH_MAX_MB", "8")) * 1024 * 1024
         self.max_attachment_bytes = int(env("MARKNEST_MAX_ATTACHMENT_MB", "64")) * 1024 * 1024
 
+        # Attachments live beside the note they belong to, in a dot folder the
+        # tree and the indexer skip. Keeping the folder next to the note is what
+        # makes a Markdown file stay portable when it is opened over SMB: the
+        # relative link inside the note resolves without this application.
+        self.asset_dirname = env("MARKNEST_ASSET_DIR", ".assets")
+
+        # Version history is an application feature rather than a filesystem one.
+        # It is kept in its own database under the runtime data directory so that
+        # deleting the search index (a derived cache) never discards it.
+        self.history_db = env(
+            "MARKNEST_HISTORY_DB", os.path.join(self.data_dir, "history.db")
+        )
+        self.version_keep = int(env("MARKNEST_VERSION_KEEP", "50"))
+        self.max_import_files = int(env("MARKNEST_MAX_IMPORT_FILES", "50"))
+
         # Listing a folder with more entries than this is truncated rather than
         # streamed: the browser cannot present a hundred thousand rows usefully,
         # and the JSON has to stay small enough for the Unix socket proxy.
@@ -182,7 +197,8 @@ class Config:
         return os.path.join(base, self.notes_dirname) if base else ""
 
     def ensure_directories(self):
-        for path in (self.data_dir, self.tmp_dir, os.path.dirname(self.index_db)):
+        for path in (self.data_dir, self.tmp_dir, os.path.dirname(self.index_db),
+                     os.path.dirname(self.history_db)):
             if path:
                 os.makedirs(path, exist_ok=True)
 

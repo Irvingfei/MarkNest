@@ -200,3 +200,17 @@ class ScanBusy(MarkNestError):
     status = 429
     code = 3014
     message = "an index scan is already running"
+
+
+class FolderNotEmpty(MarkNestError):
+    """A folder still holds entries, so deleting it would lose them."""
+
+    status = 409
+    code = 3015
+    message = "the folder is not empty"
+
+
+class VersionNotFound(MarkNestError):
+    status = 404
+    code = 3016
+    message = "that version does not exist"

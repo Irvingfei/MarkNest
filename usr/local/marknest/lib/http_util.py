@@ -536,6 +536,21 @@ def save_part_to(part, destination):
 # ------------------------------------------------------------------ responses
 
 
+class RawResponse:
+    """A handler result that is bytes rather than the JSON envelope.
+
+    Only attachments use this. The envelope exists so that every *API* error is
+    a code the frontend can localise; an image is not an API answer, and
+    base64-ing a photograph through JSON to keep one shape would be wasteful.
+    """
+
+    def __init__(self, body, content_type="application/octet-stream", status=200, headers=None):
+        self.body = body or b""
+        self.content_type = content_type
+        self.status = status
+        self.headers = headers or {}
+
+
 def wrap_success(payload, message="ok"):
     """Wrap a successful handler result in the unified response envelope.
 
@@ -549,7 +564,7 @@ def wrap_success(payload, message="ok"):
     return {"code": 0, "message": message, "data": payload}
 
 
-def encode_response(status, payload, extra_headers=None, body=None):
+def encode_response(status, payload, extra_headers=None, body=None, content_type=None):
     """Serialise a response with an accurate ``Content-Length``."""
     headers = Headers()
     headers.add("Date", email.utils.formatdate(usegmt=True))
@@ -565,7 +580,7 @@ def encode_response(status, payload, extra_headers=None, body=None):
             body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
             headers.add("Content-Type", "application/json; charset=utf-8")
     else:
-        headers.add("Content-Type", "application/octet-stream")
+        headers.add("Content-Type", content_type or "application/octet-stream")
 
     headers.add("Content-Length", str(len(body)))
     if extra_headers:
