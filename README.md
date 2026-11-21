@@ -2,7 +2,7 @@
 
 **把笔记以普通 `.md` 文件保存在 NAS 共享文件夹里的 TOS 7 应用。**
 
-![版本](https://img.shields.io/badge/version-1.1.003-2f6f4e)
+![版本](https://img.shields.io/badge/version-1.1.004-2f6f4e)
 ![TOS](https://img.shields.io/badge/TOS-7.0%2B-2f6f4e)
 ![架构](https://img.shields.io/badge/arch-x86__64%20%7C%20aarch64-2f6f4e)
 

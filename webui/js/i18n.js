@@ -1315,6 +1315,7 @@
      probed and the value is validated before it is trusted. */
   var TOS_KEYS = [
     'tos_language', 'tos-lang', 'tosLanguage', 'tos_lang',
+    'langModel', 'lang_model',
     'language', 'lang', 'locale', 'ui_language', 'i18n_language'
   ];
   var TOS_PARAMS = ['lang', 'language', 'locale'];

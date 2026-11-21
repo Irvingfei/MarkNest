@@ -415,7 +415,8 @@ def main():
             context2.route(H.PROXY_GLOB, H.make_router(state))
             page2 = context2.new_page()
             page2.add_init_script(
-                "try { if (!localStorage.getItem('tos_language')) {"
+                "try { if (!localStorage.getItem('tos_language')"
+                " && !localStorage.getItem('langModel')) {"
                 " localStorage.setItem('tos_language', 'zh-cn'); } } catch (e) {}")
             page2.goto(url, wait_until="load")
             page2.wait_for_selector(".page-library .note-card", timeout=8000)
@@ -446,6 +447,15 @@ def main():
             page2.wait_for_timeout(500)
             check("a TOS language without a dictionary renders in English",
                   page2.inner_text('#nav a[data-route="library"] span') == "Library",
+                  page2.inner_text('#nav a[data-route="library"] span'))
+            page2.evaluate(
+                "() => { localStorage.removeItem('tos_language');"
+                " localStorage.setItem('langModel', 'de-de'); }")
+            page2.reload(wait_until="load")
+            page2.wait_for_selector(".page-library .note-card", timeout=8000)
+            page2.wait_for_timeout(500)
+            check("the TOS langModel key is followed too",
+                  page2.inner_text('#nav a[data-route="library"] span') == "Bibliothek",
                   page2.inner_text('#nav a[data-route="library"] span'))
             route(page2, "#/settings", ".page-settings .settings-grid")
             page2.wait_for_timeout(400)
