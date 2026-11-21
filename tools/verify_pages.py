@@ -204,6 +204,15 @@ def main():
             check("the folder appears in the sidebar", True)
             check("the folder was created on the backend",
                   any(path.endswith("/folders/new") for _, path, _ in state["requests"]))
+            route(page, "#/import", ".page-import .dropzone")
+            destination = page.locator(
+                ".page-import .panel:has(.panel-title:text-is('导入到'))")
+            check("the destination picker appears once a subfolder exists",
+                  destination.is_visible())
+            check("the new folder is offered as a destination",
+                  page.locator(".page-import select option",
+                               has_text="archive").count() == 1)
+            route(page, "#/library", ".page-library .note-card")
             page.click('#folder-list [data-folder="archive"]')
             page.wait_for_selector(".page-library .empty-state", timeout=6000)
             page.wait_for_timeout(400)
@@ -523,6 +532,15 @@ def main():
             check("the note count is zero", cells and cells[0] == "0", cells)
             check("and the revision count is zero",
                   len(cells) > 1 and cells[1] == "0", cells)
+
+            page.reload(wait_until="load")
+            page.wait_for_selector(".page-settings .settings-grid", timeout=8000)
+            route(page, "#/import", ".page-import .dropzone")
+            check("the destination picker is hidden when the library has no subfolders",
+                  page.locator(".page-import .panel:has(.panel-title:text-is('导入到'))")
+                  .is_hidden())
+            check("the rest of the import page is still there",
+                  page.locator(".page-import .text-create").is_visible())
 
             check("no uncaught error during the run", not errors, "; ".join(errors))
             browser.close()

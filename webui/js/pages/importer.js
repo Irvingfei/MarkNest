@@ -632,29 +632,6 @@
       Store.settings.set('lastFolder', state.dir);
     });
 
-    function render() {
-      UI.clear(select);
-      select.appendChild(UI.el('option', {
-        value: '',
-        text: I18N.t('import.rootFolder')
-      }));
-      (Store.state.folders || []).forEach(function (folder) {
-        select.appendChild(UI.el('option', {
-          value: folder.path,
-          text: folder.path
-        }));
-      });
-      var known = (Store.state.folders || []).some(function (folder) {
-        return folder.path === state.dir;
-      });
-      if (!known) {
-        state.dir = '';
-      }
-      select.value = state.dir;
-    }
-
-    render();
-
     var panel = UI.el('section', { class: 'panel' }, [
       UI.el('div', { class: 'panel-head' }, [
         UI.el('div', null, [
@@ -665,6 +642,34 @@
       UI.el('label', { class: 'field' }, [select])
     ]);
 
+    function render() {
+      var folders = Store.state.folders || [];
+      UI.clear(select);
+      select.appendChild(UI.el('option', {
+        value: '',
+        text: I18N.t('import.rootFolder')
+      }));
+      folders.forEach(function (folder) {
+        select.appendChild(UI.el('option', {
+          value: folder.path,
+          text: folder.path
+        }));
+      });
+      if (Store.state.folders) {
+        var known = folders.some(function (folder) {
+          return folder.path === state.dir;
+        });
+        if (!known) {
+          state.dir = '';
+        }
+      }
+      select.value = state.dir;
+      // Without subfolders the only choice is the root the library already
+      // uses, so the picker would show a dropdown that cannot change anything.
+      panel.hidden = !folders.length;
+    }
+
+    render();
     return { panel: panel, render: render };
   }
 
