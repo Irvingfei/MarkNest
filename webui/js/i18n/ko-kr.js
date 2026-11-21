@@ -212,6 +212,7 @@
     'editor.preview': '미리보기',
     'editor.split': '분할',
     'editor.outline': '개요',
+    'editor.resizeOutline': '끌어서 개요 너비 조절',
     'editor.outlineEmpty': '아직 제목이 없습니다',
     'editor.outlineEmptyBody': '# 또는 ##로 제목을 표시하면 개요가 자동으로 만들어집니다.',
     'editor.versions': '버전 기록',

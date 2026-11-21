@@ -199,6 +199,40 @@ def main():
             check("the preview rendered the note",
                   "First draft" in page.inner_text("#editor-preview"))
 
+            print("\n6b. the outline resizes from its left edge")
+            grip = page.locator(".editor-outline .outline-resizer")
+            check("the outline has a drag handle", grip.count() == 1)
+            start_box = page.locator(".editor-outline").bounding_box()
+            grip_box = grip.bounding_box()
+            check("the handle sits on the outline's left edge",
+                  abs((grip_box["x"] + grip_box["width"] / 2) - start_box["x"]) <= 1,
+                  (grip_box["x"], start_box["x"]))
+            y = start_box["y"] + 60
+            page.mouse.move(grip_box["x"] + grip_box["width"] / 2, y)
+            page.mouse.down()
+            page.mouse.move(grip_box["x"] + grip_box["width"] / 2 - 80, y, steps=6)
+            page.mouse.up()
+            page.wait_for_timeout(250)
+            grown = page.locator(".editor-outline").bounding_box()["width"]
+            check("dragging left widens the outline",
+                  grown >= start_box["width"] + 60,
+                  (start_box["width"], grown))
+            stored = page.evaluate(
+                "() => parseInt(localStorage.getItem('marknest.outlineWidth'), 10)")
+            check("the chosen width is remembered", abs(stored - round(grown)) <= 1,
+                  (stored, grown))
+            grip.focus()
+            page.keyboard.press("ArrowRight")
+            page.wait_for_timeout(150)
+            narrowed = page.locator(".editor-outline").bounding_box()["width"]
+            check("the arrow key narrows the outline by one step",
+                  abs(narrowed - (grown - 16)) <= 1, (grown, narrowed))
+            page.keyboard.press("Home")
+            page.wait_for_timeout(150)
+            reset_width = page.locator(".editor-outline").bounding_box()["width"]
+            check("Home restores the default width", abs(reset_width - 256) <= 1,
+                  reset_width)
+
             print("\n7. the toolbar inserts Markdown through the editor")
             page.click(".cm-content")
             page.keyboard.press("Control+A")

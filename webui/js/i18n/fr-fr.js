@@ -212,6 +212,7 @@
     'editor.preview': 'Aperçu',
     'editor.split': 'Divisé',
     'editor.outline': 'Plan',
+    'editor.resizeOutline': 'Faire glisser pour redimensionner le plan',
     'editor.outlineEmpty': 'Aucun titre pour le moment',
     'editor.outlineEmptyBody': 'Marquez les titres avec # ou ## et le plan se construit tout seul.',
     'editor.versions': 'Historique des versions',

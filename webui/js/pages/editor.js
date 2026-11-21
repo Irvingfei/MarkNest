@@ -302,10 +302,112 @@
     nodes.outlineList = UI.el('div', { class: 'outline-list' });
     nodes.outline.appendChild(nodes.outlineHead);
     nodes.outline.appendChild(nodes.outlineList);
+    nodes.outline.appendChild(UI.el('div', {
+      class: 'outline-resizer',
+      role: 'separator',
+      'aria-orientation': 'vertical',
+      tabindex: '0',
+      title: I18N.t('editor.resizeOutline'),
+      'aria-label': I18N.t('editor.resizeOutline')
+    }));
     body.appendChild(nodes.outline);
+    bindOutlineResize(nodes.outline, nodes.outline.lastChild);
 
     page.appendChild(body);
     bindImageIntake();
+  }
+
+  /* The outline width is a preference like the sidebar's. Dragging the left
+     edge changes it; the editor keeps at least 360px so the handle cannot
+     swallow the writing surface. */
+  var outlineMin = 200;
+  var outlineMax = 480;
+  var outlineDefault = 256;
+  var outlineKey = 'marknest.outlineWidth';
+
+  function bindOutlineResize(outline, grip) {
+    var saved = outlineDefault;
+    try {
+      var raw = parseInt(global.localStorage.getItem(outlineKey), 10);
+      if (!isNaN(raw)) {
+        saved = raw;
+      }
+    } catch (error) {
+      /* storage may be unavailable; the default is fine */
+    }
+    applyOutlineWidth(saved);
+
+    function ceiling() {
+      var body = outline.parentNode;
+      var available = body ? body.clientWidth : global.innerWidth;
+      return Math.max(outlineMin, Math.min(outlineMax, available - 360));
+    }
+
+    function applyOutlineWidth(width) {
+      var clamped = Math.max(outlineMin, Math.min(ceiling(), width));
+      outline.style.width = clamped + 'px';
+      outline.style.flexBasis = clamped + 'px';
+      return clamped;
+    }
+
+    function persist(width) {
+      try {
+        global.localStorage.setItem(outlineKey, String(width));
+      } catch (error) {
+        /* not fatal */
+      }
+    }
+
+    function currentWidth() {
+      return Math.round(outline.getBoundingClientRect().width);
+    }
+
+    grip.addEventListener('pointerdown', function (event) {
+      event.preventDefault();
+      var startX = event.clientX;
+      var startWidth = currentWidth();
+      var width = startWidth;
+      try {
+        grip.setPointerCapture(event.pointerId);
+      } catch (error) {
+        /* pointer capture is a convenience, not a requirement */
+      }
+      global.document.body.classList.add('is-resizing');
+
+      function move(moveEvent) {
+        width = applyOutlineWidth(startWidth - (moveEvent.clientX - startX));
+      }
+      function finish() {
+        global.document.body.classList.remove('is-resizing');
+        grip.removeEventListener('pointermove', move);
+        grip.removeEventListener('pointerup', finish);
+        grip.removeEventListener('pointercancel', finish);
+        persist(width);
+      }
+      grip.addEventListener('pointermove', move);
+      grip.addEventListener('pointerup', finish);
+      grip.addEventListener('pointercancel', finish);
+    });
+
+    grip.addEventListener('keydown', function (event) {
+      var width = currentWidth();
+      var next;
+      if (event.key === 'ArrowLeft') {
+        next = applyOutlineWidth(width + 16);
+      } else if (event.key === 'ArrowRight') {
+        next = applyOutlineWidth(width - 16);
+      } else if (event.key === 'Home') {
+        next = applyOutlineWidth(outlineDefault);
+      } else {
+        return;
+      }
+      event.preventDefault();
+      persist(next);
+    });
+
+    grip.addEventListener('dblclick', function () {
+      persist(applyOutlineWidth(outlineDefault));
+    });
   }
 
   function buildToolbar() {

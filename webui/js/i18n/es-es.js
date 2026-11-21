@@ -212,6 +212,7 @@
     'editor.preview': 'Vista previa',
     'editor.split': 'Dividir',
     'editor.outline': 'Esquema',
+    'editor.resizeOutline': 'Arrastrar para ajustar el ancho del esquema',
     'editor.outlineEmpty': 'Aún no hay encabezados',
     'editor.outlineEmptyBody': 'Marque los encabezados con # o ## y el esquema se crea solo.',
     'editor.versions': 'Historial de versiones',

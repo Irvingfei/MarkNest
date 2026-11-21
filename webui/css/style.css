@@ -1466,6 +1466,7 @@ body.is-resizing .sidebar { transition: none; }
 .editor-foot .foot-item { white-space: nowrap; font-variant-numeric: tabular-nums; }
 
 .editor-outline {
+  position: relative;
   width: 256px;
   flex: 0 0 256px;
   min-height: 0;
@@ -1475,6 +1476,32 @@ body.is-resizing .sidebar { transition: none; }
   border-left: 1px solid var(--line);
 }
 .editor-outline[hidden] { display: none; }
+
+/* Drag handle on the outline's left edge, mirroring the sidebar grip. */
+.outline-resizer {
+  position: absolute;
+  top: 0;
+  left: -4px;
+  width: 8px;
+  height: 100%;
+  z-index: 6;
+  cursor: col-resize;
+  touch-action: none;
+}
+.outline-resizer::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 2px;
+  border-radius: 2px;
+  background: transparent;
+  transition: background 0.15s ease;
+}
+.outline-resizer:hover::after,
+.outline-resizer:focus-visible::after,
+body.is-resizing .outline-resizer::after { background: var(--accent); }
 .outline-head {
   flex: 0 0 auto;
   display: flex;

@@ -212,6 +212,7 @@
     'editor.preview': 'Vorschau',
     'editor.split': 'Geteilt',
     'editor.outline': 'Gliederung',
+    'editor.resizeOutline': 'Ziehen, um die Breite der Gliederung zu ändern',
     'editor.outlineEmpty': 'Noch keine Überschriften',
     'editor.outlineEmptyBody': 'Markieren Sie Überschriften mit # oder ##, dann entsteht die Gliederung automatisch.',
     'editor.versions': 'Versionsverlauf',

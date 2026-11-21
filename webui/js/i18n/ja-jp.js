@@ -212,6 +212,7 @@
     'editor.preview': 'プレビュー',
     'editor.split': '分割表示',
     'editor.outline': 'アウトライン',
+    'editor.resizeOutline': 'ドラッグしてアウトラインの幅を調整',
     'editor.outlineEmpty': '見出しはまだありません',
     'editor.outlineEmptyBody': '# や ## で見出しを付けると、アウトラインが自動で作成されます。',
     'editor.versions': 'バージョン履歴',

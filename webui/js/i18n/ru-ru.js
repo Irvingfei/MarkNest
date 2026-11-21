@@ -212,6 +212,7 @@
     'editor.preview': 'Предпросмотр',
     'editor.split': 'Разделить',
     'editor.outline': 'Структура',
+    'editor.resizeOutline': 'Перетащите, чтобы изменить ширину структуры',
     'editor.outlineEmpty': 'Заголовков пока нет',
     'editor.outlineEmptyBody': 'Отмечайте заголовки символами # или ##, и структура построится сама.',
     'editor.versions': 'История версий',
