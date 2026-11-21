@@ -195,9 +195,12 @@ class StubApi:
 
     def stats(self):
         view = self.library_view()
+        total = 4 * 1024 ** 4
+        used = int(1.25 * 1024 ** 4)
         return {
             "notes": view["count"],
             "bytes": view["totals"]["bytes"],
+            "disk": {"total": total, "used": used, "free": total - used},
             "folders": len(view["folders"]),
             "versions": (sum(len(items) for items in self.versions.values())
                          if self.notes else 0),

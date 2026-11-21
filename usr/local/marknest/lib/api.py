@@ -119,6 +119,23 @@ def _folder_of(rel_path):
     return (rel_path or "").rpartition("/")[0]
 
 
+def _disk_usage(path):
+    """Bytes used and available on the volume that holds the notes share."""
+    if not path:
+        return None
+    try:
+        st = os.statvfs(path)
+    except (OSError, AttributeError):
+        return None
+    total = int(st.f_frsize * st.f_blocks)
+    free = int(st.f_frsize * st.f_bavail)
+    return {
+        "total": total,
+        "free": free,
+        "used": max(0, total - free),
+    }
+
+
 def _library_view(user, limit):
     notes = []
     for row in store.list_notes(user, limit=limit):
@@ -242,6 +259,7 @@ class Api:
         return {
             "notes": totals["notes"],
             "bytes": totals["bytes"],
+            "disk": _disk_usage(config.share_root()),
             "folders": len(library.list_folders(user)),
             # Revisions only exist through their note. With an empty library
             # any row still on disk belongs to a note deleted outside the

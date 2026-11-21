@@ -372,13 +372,26 @@
       nodes.storageText.textContent = '—';
       return;
     }
+    var disk = stats.disk;
+    if (disk && disk.total > 0) {
+      var ratio = Math.min(100, Math.max(2, (disk.used / disk.total) * 100));
+      nodes.storageText.textContent = UI.formatBytes(disk.used) + ' / ' +
+        UI.formatBytes(disk.total);
+      if (nodes.storageBar) {
+        nodes.storageBar.style.width = ratio.toFixed(1) + '%';
+      }
+      nodes.storageText.setAttribute('title',
+        I18N.t('shell.storageFree', { free: UI.formatBytes(disk.free) }) + ' · ' +
+        I18N.t('library.notesHere', { n: stats.notes }));
+      return;
+    }
     nodes.storageText.textContent = UI.formatBytes(stats.bytes) + ' · ' +
       I18N.t('library.notesHere', { n: stats.notes });
     if (nodes.storageBar) {
-      // There is no quota in the API, so the meter is scaled against a soft
-      // 512 MB reference and the exact figure is always written beside it.
-      var ratio = Math.min(100, Math.max(2, (stats.bytes / (512 * 1024 * 1024)) * 100));
-      nodes.storageBar.style.width = ratio.toFixed(1) + '%';
+      // No volume statistics (for example a remote development harness): keep
+      // the note bytes visible and scale the meter against a soft reference.
+      var fallback = Math.min(100, Math.max(2, (stats.bytes / (512 * 1024 * 1024)) * 100));
+      nodes.storageBar.style.width = fallback.toFixed(1) + '%';
       nodes.storageText.setAttribute('title', UI.formatBytes(stats.bytes));
     }
   }

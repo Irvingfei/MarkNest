@@ -105,10 +105,96 @@
     actions.appendChild(UI.el('button', {
       type: 'button',
       class: 'btn btn-ghost',
+      onclick: openFromNas
+    }, [UI.icon('folder'), UI.el('span', { text: I18N.t('library.openFromNas') })]));
+    actions.appendChild(UI.el('button', {
+      type: 'button',
+      class: 'btn btn-ghost',
       title: I18N.t('common.refresh'),
       onclick: function () { load(true); }
     }, [UI.icon('refresh'), UI.el('span', { text: I18N.t('common.refresh') })]));
     nodes.head.appendChild(actions);
+  }
+
+  /* Browse the NAS folder that backs the library and open a file by path, so a
+     note dropped in over SMB can be reached without waiting for the grid. */
+  function openFromNas() {
+    var list = UI.el('div', { class: 'nas-list' });
+    var pathLabel = UI.el('span', { class: 'nas-path-text' });
+    var current = '';
+    var up = UI.el('button', {
+      type: 'button',
+      class: 'btn btn-sm btn-ghost',
+      onclick: function () { if (current) { load(parentOf(current)); } }
+    }, [UI.icon('arrow-up'), UI.el('span', { text: I18N.t('library.nasUp') })]);
+    var dialog = UI.modal({
+      title: I18N.t('library.openFromNas'),
+      subtitle: I18N.t('library.openFromNasHint'),
+      body: UI.el('div', { class: 'nas-browser' }, [
+        UI.el('div', { class: 'nas-bar' }, [up, pathLabel]),
+        list
+      ])
+    });
+
+    function parentOf(path) {
+      var at = path.lastIndexOf('/');
+      return at < 0 ? '' : path.slice(0, at);
+    }
+
+    function openNote(path) {
+      dialog.close(true);
+      Router.navigate('read', { p: path });
+    }
+
+    function render(result) {
+      UI.clear(list);
+      if (!result.entries || !result.entries.length) {
+        list.appendChild(UI.el('div', {
+          class: 'nas-empty',
+          text: I18N.t('library.nasEmpty')
+        }));
+        return;
+      }
+      result.entries.forEach(function (entry) {
+        var isDir = entry.type === 'dir';
+        var row = UI.el(isDir || entry.note ? 'button' : 'div', {
+          type: isDir || entry.note ? 'button' : null,
+          class: 'nas-row' + (isDir || entry.note ? '' : ' is-disabled'),
+          onclick: isDir
+            ? function () { load(entry.path); }
+            : (entry.note ? function () { openNote(entry.path); } : null)
+        }, [
+          UI.icon(isDir ? 'folder' : 'file-text'),
+          UI.el('span', { class: 'nas-name', text: entry.name }),
+          UI.el('span', {
+            class: 'nas-meta',
+            text: isDir ? '' : (entry.note
+              ? UI.formatBytes(entry.size)
+              : I18N.t('library.nasUnsupported'))
+          }),
+          isDir ? UI.icon('chevron-right') : null
+        ]);
+        list.appendChild(row);
+      });
+    }
+
+    function load(path) {
+      list.textContent = '';
+      list.appendChild(UI.el('div', { class: 'nas-empty', text: I18N.t('common.loading') }));
+      API.getTree(path).then(function (result) {
+        current = result.path || '';
+        pathLabel.textContent = current || I18N.t('library.allNotes');
+        up.disabled = !current;
+        render(result);
+      }).catch(function (error) {
+        UI.toast(I18N.errorText(error), 'bad');
+        render({ entries: [] });
+      });
+    }
+
+    up.disabled = true;
+    pathLabel.textContent = I18N.t('library.allNotes');
+    load('');
   }
 
   function lastSegment(path) {

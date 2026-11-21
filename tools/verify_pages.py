@@ -75,6 +75,12 @@ def main():
             check("four statistics are shown",
                   page.locator(".page-library .stat").count() == 4,
                   page.locator(".page-library .stat").count())
+            storage_text = page.inner_text("#storage-text")
+            check("the storage card shows volume usage out of capacity",
+                  storage_text == "1.25 TB / 4.00 TB", storage_text)
+            check("its tooltip carries the free space",
+                  "剩余 2.75 TB" in (page.get_attribute("#storage-text", "title") or ""),
+                  page.get_attribute("#storage-text", "title"))
             check("a plain text file is not offered as a note",
                   page.locator(".note-card-title", has_text="plain").count() == 0)
 
@@ -128,6 +134,25 @@ def main():
             check("the breadcrumb carries the folder, not the title again",
                   reader_title not in reader_crumb,
                   "%s / %s" % (reader_crumb, reader_title))
+            route(page, "#/library", ".page-library .note-card")
+
+            print("\n2b. a note is opened from the NAS folder")
+            page.locator(".page-head-actions button", has_text="从 NAS 打开").click()
+            page.wait_for_selector(".modal .nas-browser .nas-row", timeout=6000)
+            check("the picker lists the folders and notes on the share",
+                  page.locator(".modal .nas-row").count() == 3,
+                  page.locator(".modal .nas-row").count())
+            page.locator(".modal .nas-row", has_text="notes").first.click()
+            page.wait_for_timeout(500)
+            check("a folder opens inside the picker",
+                  page.inner_text(".nas-path-text") == "notes",
+                  page.inner_text(".nas-path-text"))
+            page.locator(".modal .nas-row", has_text="long.md").first.click()
+            page.wait_for_selector(".page-reader .reader-title", timeout=8000)
+            page.wait_for_timeout(500)
+            check("the picked note opens in the reader",
+                  page.inner_text(".page-reader .reader-title") == "Long note",
+                  page.inner_text(".page-reader .reader-title"))
             route(page, "#/library", ".page-library .note-card")
 
             print("\n3. a note is created and another deleted")
