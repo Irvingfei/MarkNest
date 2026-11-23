@@ -352,6 +352,14 @@
 
   /* ---------------------------------------------------------------- filter */
 
+  /* The library is a file browser, so the name shown is the file name on disk
+     (note.name). The first Markdown heading stays searchable and is still what
+     the reader and editor display; only the listing follows the file name, so
+     a rename is reflected immediately. */
+  function displayName(note) {
+    return note.name || note.path;
+  }
+
   function visibleNotes() {
     var notes = (Store.state.library && Store.state.library.notes) || [];
     var folder = state.folder;
@@ -369,7 +377,7 @@
     });
     result.sort(function (a, b) {
       if (state.sort === 'name') {
-        return (a.title || a.path).localeCompare(b.title || b.path, I18N.getLanguage());
+        return displayName(a).localeCompare(displayName(b), I18N.getLanguage());
       }
       if (state.sort === 'size') {
         return (b.size || 0) - (a.size || 0);
@@ -483,7 +491,7 @@
       class: 'note-card',
       tabindex: '0',
       role: 'button',
-      'aria-label': note.title || note.path,
+      'aria-label': displayName(note),
       onclick: function () { open(note); },
       onkeydown: function (event) {
         if (event.key === 'Enter' || event.key === ' ') {
@@ -506,7 +514,7 @@
           }
         }, [UI.icon('more')])
       ]),
-      UI.el('h3', { class: 'note-card-title', text: note.title || note.path }),
+      UI.el('h3', { class: 'note-card-title', text: displayName(note) }),
       UI.el('p', { class: 'note-card-excerpt', text: note.excerpt || I18N.t('common.empty') }),
       UI.el('div', { class: 'note-card-foot' }, [
         UI.el('span', { class: 'note-card-folder' }, [
@@ -525,7 +533,7 @@
       class: 'note-row',
       tabindex: '0',
       role: 'button',
-      'aria-label': note.title || note.path,
+      'aria-label': displayName(note),
       onclick: function () { open(note); },
       onkeydown: function (event) {
         if (event.key === 'Enter' || event.key === ' ') {
@@ -536,7 +544,7 @@
     }, [
       UI.el('span', { class: 'file-chip' + (isMarkdown(note) ? ' is-text' : '') },
         [UI.icon(isMarkdown(note) ? 'file-text' : 'file')]),
-      UI.el('span', { class: 'note-row-title', text: note.title || note.path }),
+      UI.el('span', { class: 'note-row-title', text: displayName(note) }),
       UI.el('span', { class: 'note-row-folder', text: note.folder || I18N.t('common.rootFolder') }),
       UI.el('span', { class: 'note-row-size', text: UI.formatBytes(note.size) }),
       UI.el('span', { class: 'note-row-time', text: UI.formatTimeAgo(note.mtime_ns) }),
@@ -601,7 +609,7 @@
 
   function remove(note) {
     UI.confirm({
-      title: I18N.t('library.deleteTitle', { name: note.title || note.path }),
+      title: I18N.t('library.deleteTitle', { name: displayName(note) }),
       message: I18N.t('library.deleteConfirm'),
       confirmLabel: I18N.t('common.delete'),
       danger: true
@@ -610,7 +618,7 @@
         return;
       }
       API.deleteNote(note.path).then(function () {
-        UI.toast(I18N.t('library.deleted', { name: note.title || note.path }), 'ok');
+        UI.toast(I18N.t('library.deleted', { name: displayName(note) }), 'ok');
         refresh();
       }).catch(Shell.reportError);
     });

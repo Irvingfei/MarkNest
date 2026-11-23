@@ -83,6 +83,8 @@ def main():
                   page.get_attribute("#storage-text", "title"))
             check("a plain text file is not offered as a note",
                   page.locator(".note-card-title", has_text="plain").count() == 0)
+            check("cards are titled with the file name, not the heading",
+                  page.locator('.note-card-title:text-is("roadmap.md")').count() == 1)
 
             check("the library title is not repeated as an eyebrow",
                   page.locator(".page-library .eyebrow").count() == 0)
@@ -194,7 +196,7 @@ def main():
                   "demo/prompt.md" in api.notes)
             route(page, "#/library", ".page-library .note-card")
             page.wait_for_timeout(500)
-            roadmap = page.locator(".note-card", has_text="Roadmap")
+            roadmap = page.locator(".note-card", has_text="roadmap.md")
             roadmap.locator(".card-menu-btn").click()
             page.wait_for_selector("#overlay-root .menu")
             menu_item(page, "删除").click()

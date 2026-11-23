@@ -81,13 +81,16 @@ def main():
                 "!!document.querySelector('.app > .main > #view')"))
             check("the editor bundle loaded", page.evaluate(
                 "() => typeof window.MDEditor === 'object'"))
-            check("the library listed the notes", "Welcome to MarkNest" in
+            check("the library listed the notes", "welcome.md" in
                   page.inner_text("#library-body"),
                   page.inner_text("#library-body")[:120])
+            check("the card is titled with the file name, not the heading",
+                  page.inner_text(".note-card-title").strip() == "welcome.md",
+                  page.inner_text(".note-card-title"))
             check("no uncaught error during boot", not errors, errors[:2])
 
             print("\n2. the reader opens a note")
-            page.click('.note-card:has(.note-card-title:text-is("Welcome to MarkNest"))')
+            page.click('.note-card:has(.note-card-title:text-is("welcome.md"))')
             page.wait_for_selector(".page-reader .prose h1", timeout=8000)
             page.wait_for_timeout(400)
             check("the title is typeset", page.inner_text(".reader-title") ==
