@@ -1,37 +1,59 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="MarkNest">
   <defs>
-    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#357a5b"/>
-      <stop offset="1" stop-color="#1d4a37"/>
+    <linearGradient id="bg" x1="0" y1="0" x2="0.55" y2="1">
+      <stop offset="0" stop-color="#fbfdff"/>
+      <stop offset="0.55" stop-color="#e9f2fb"/>
+      <stop offset="1" stop-color="#c4ddf4"/>
     </linearGradient>
     <linearGradient id="paper" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#fbf8ef"/>
-      <stop offset="1" stop-color="#efe9d8"/>
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#f2f7fc"/>
     </linearGradient>
+    <linearGradient id="orange" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f7ad3c"/>
+      <stop offset="1" stop-color="#e8890f"/>
+    </linearGradient>
+    <linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <clipPath id="tile">
+      <rect x="16" y="16" width="480" height="480" rx="112"/>
+    </clipPath>
   </defs>
 
-  <!-- A tiled badge rather than a floating sheet: the mark needs enough
-       contrast to survive a 32px launcher grid, and the green tile carries
-       the application's accent colour. -->
-  <rect x="24" y="24" width="464" height="464" rx="112" fill="url(#tile)"/>
-  <rect x="26" y="26" width="460" height="460" rx="110" fill="none"
-        stroke="#ffffff" stroke-opacity="0.10" stroke-width="4"/>
+  <rect x="16" y="16" width="480" height="480" rx="112" fill="url(#bg)"/>
+  <path d="M318 496 L496 318 V496 Z" fill="#7fc9b4" opacity="0.22"/>
+  <path d="M374 496 L496 374 V496 Z" fill="#76aee8" opacity="0.24"/>
+  <path d="M430 496 L496 430 V496 Z" fill="#efb35e" opacity="0.18"/>
+  <rect x="16" y="16" width="480" height="480" rx="112" fill="none"
+        stroke="#ffffff" stroke-opacity="0.85" stroke-width="3"/>
+  <rect x="16" y="16" width="480" height="230" fill="url(#gloss)" clip-path="url(#tile)"/>
 
-  <!-- Two woven arcs: the nest that holds the note. -->
-  <path d="M104 402 C158 452 354 452 408 402" fill="none" stroke="#8fc3a8"
-        stroke-width="22" stroke-linecap="round"/>
-  <path d="M128 434 C178 466 334 466 384 434" fill="none" stroke="#5f9b7d"
-        stroke-width="14" stroke-linecap="round" opacity="0.9"/>
+  <path d="M124 88 H304 L388 172 V372 Q388 400 360 400 H124 Q96 400 96 372
+           V116 Q96 88 124 88 Z" fill="url(#paper)" stroke="#26384a"
+        stroke-width="18" stroke-linejoin="round"/>
+  <path d="M304 88 V172 H388" fill="#dde7f1" stroke="#26384a"
+        stroke-width="14" stroke-linejoin="round"/>
 
-  <!-- The note: a paper sheet with a folded corner, the app's subject. -->
-  <path d="M148 120 a28 28 0 0 1 28 -28 h116 l64 64 v196 a28 28 0 0 1 -28 28
-           h-152 a28 28 0 0 1 -28 -28 z" fill="url(#paper)"/>
-  <path d="M292 92 l64 64 h-64 z" fill="#d3e4d8"/>
-  <path d="M292 92 l64 64" fill="none" stroke="#b9d3c2" stroke-width="4"/>
+  <rect x="132" y="120" width="150" height="92" rx="18" fill="url(#orange)"/>
+  <rect x="137" y="125" width="140" height="38" rx="14" fill="#ffffff" opacity="0.12"/>
+  <path d="M158 190 V142 H168 L180 168 L192 142 H202 V190 H192 V160
+           L184 178 H176 L168 160 V190 Z" fill="#ffffff"/>
+  <path fill-rule="evenodd" fill="#ffffff" d="M212 142 H228 C246 142 256 153 256 166
+           C256 179 246 190 228 190 H212 Z M222 152 V180 H227 C238 180 244 174 244 166
+           C244 158 238 152 227 152 Z"/>
 
-  <!-- The Markdown mark: a heavy M and a down arrow. -->
-  <path d="M176 300 V202 h26 l30 40 30 -40 h26 v98 h-26 v-54 l-30 40
-           l-30 -40 v54 z" fill="#24523d"/>
-  <path d="M324 202 v88 m-18 -18 l18 18 18 -18" fill="none" stroke="#24523d"
-        stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="152" cy="241" r="12" fill="#dd5568"/>
+  <rect x="174" y="230" width="104" height="22" rx="11" fill="#3fae8f"/>
+  <rect x="286" y="230" width="42" height="22" rx="11" fill="#dd5568"/>
+  <rect x="336" y="230" width="44" height="22" rx="11" fill="#26384a"/>
+  <rect x="152" y="276" width="106" height="22" rx="11" fill="#3fae8f"/>
+  <rect x="266" y="276" width="114" height="22" rx="11" fill="#e99a2e"/>
+  <rect x="152" y="322" width="118" height="22" rx="11" fill="#4b93e6"/>
+  <rect x="278" y="322" width="54" height="22" rx="11" fill="#dd5568"/>
+  <rect x="152" y="368" width="42" height="22" rx="11" fill="#d9922e"/>
+  <rect x="202" y="368" width="42" height="22" rx="11" fill="#4b93e6"/>
+  <rect x="252" y="368" width="42" height="22" rx="11" fill="#dd5568"/>
+  <rect x="302" y="368" width="50" height="22" rx="11" fill="#3fae8f"/>
 </svg>
